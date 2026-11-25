@@ -5,6 +5,7 @@ import { useAuth } from './context/authContextValue';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Toast from './components/Toast';
+import StudioCursor from './components/StudioCursor';
 
 import LandingPage from './pages/LandingPage';
 import DashboardPage from './pages/DashboardPage';
@@ -137,7 +138,6 @@ function AppContent() {
     [authLoading, isAuthenticated, navigateTo, showToast]
   );
 
-  // Derive guarded page cleanly without triggering cascading setState inside useEffect
   const effectivePage = useMemo(() => {
     if (authLoading) return activePage;
     if (PROTECTED_PAGES.has(activePage) && !isAuthenticated) return 'login';
@@ -147,7 +147,6 @@ function AppContent() {
 
   const redirectTarget = PROTECTED_PAGES.has(activePage) ? activePage : intendedPage;
 
-  // Browser back/forward button listener
   useEffect(() => {
     const handlePopState = () => {
       setActivePageState(getPageFromPathname());
@@ -156,7 +155,6 @@ function AppContent() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Synchronize URL bar with derived effectivePage
   useEffect(() => {
     if (authLoading) return;
     const expectedPath = PAGE_TO_PATH[effectivePage] || '/';
@@ -186,7 +184,7 @@ function AppContent() {
       return;
     }
     navigateTo('generator');
-    showToast(`Template "${example.title}" loaded into generator!`, 'info');
+    showToast(`Template "${example.title}" loaded into studio!`, 'info');
   };
 
   const handleSelectForRegenerate = (historyItem) => {
@@ -204,7 +202,7 @@ function AppContent() {
       custom_negative_prompt: ''
     });
     navigateTo('generator');
-    showToast(`Loaded "${historyItem.campaign_title}" for customization.`, 'info');
+    showToast(`Loaded "${historyItem.campaign_title}" into studio.`, 'info');
   };
 
   const handleGenerationSuccess = (resultData) => {
@@ -218,20 +216,26 @@ function AppContent() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-200 gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-lg">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#f5f7f6] dark:bg-[#070a09] text-slate-800 dark:text-slate-100 gap-4 transition-colors">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white shadow-lg shadow-emerald-950/30 border border-emerald-400/20">
           <Leaf className="w-6 h-6" />
         </div>
-        <div className="flex items-center gap-2 text-sm font-semibold">
-          <Loader2 className="w-4 h-4 animate-spin text-emerald-600 dark:text-emerald-400" />
-          <span>Restoring your secure session...</span>
+        <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+          <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
+          <span>Initializing Environmental AI Studio...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors duration-200">
+    <div className="relative min-h-screen flex flex-col bg-[var(--studio-bg)] text-[var(--studio-text)] transition-colors duration-300">
+      {/* Custom Studio Cursor & Radial Emerald Glow */}
+      <StudioCursor />
+
+      {/* Subtle architectural background grid */}
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 studio-grid-bg opacity-65 -z-10" />
+
       {/* Navigation Header */}
       <Navbar
         activePage={effectivePage}
@@ -242,8 +246,8 @@ function AppContent() {
         showToast={showToast}
       />
 
-      {/* Main Page Content */}
-      <main className="flex-1">
+      {/* Main Page Content with subtle route entrance */}
+      <main key={effectivePage} className="flex-1 animate-in">
         {effectivePage === 'landing' && (
           <LandingPage
             setActivePage={setActivePage}

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { saveCampaignToHistory, generateCampaignImage } from '../services/api';
 import { downloadImageFile } from '../utils/download';
+import { SpotlightCard, MagneticButton, StudioImage } from '../components/MotionPrimitives';
 
 export default function ResultPage({
   generatedData,
@@ -34,18 +35,18 @@ export default function ResultPage({
   if (!generatedData) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-20 text-center space-y-4">
-        <h2 className="text-2xl font-bold text-slate-800 dark:text-white">
-          No Generated Image Found
+        <h2 className="font-display text-2xl font-bold text-slate-900 dark:text-white">
+          No Generated Visual Found
         </h2>
         <p className="text-slate-600 dark:text-slate-400 text-sm">
-          Please launch a new visual generation from the generator dashboard.
+          Launch a new visual generation from the Studio workspace.
         </p>
         <button
           type="button"
           onClick={onEditPrompt}
-          className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-sm cursor-pointer"
+          className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-sm cursor-pointer"
         >
-          Go to Generator
+          Open Studio
         </button>
       </div>
     );
@@ -69,7 +70,7 @@ export default function ResultPage({
         seed: generatedData.seed,
       });
       setIsSaved(true);
-      showToast('Campaign visual permanently saved to History!', 'success');
+      showToast('Campaign visual saved to Gallery!', 'success');
     } catch (err) {
       showToast(err.message || 'Failed to save campaign to history.', 'error');
     } finally {
@@ -105,7 +106,7 @@ export default function ResultPage({
       });
       setGeneratedData(res.data);
       setIsSaved(false);
-      showToast('Regenerated visual ready!', 'success');
+      showToast('New FLUX.1 Dev variation ready!', 'success');
     } catch (err) {
       showToast(err.message || 'Regeneration failed.', 'error');
     } finally {
@@ -119,207 +120,200 @@ export default function ResultPage({
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 animate-in">
-      {/* Top action header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+      {/* Top Action Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-900/10 dark:border-white/[0.08]">
         <div>
-          <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-            FLUX.1 Dev Output
+          <span className="text-[11px] font-mono font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+            FLUX.1 Dev Render
           </span>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+          <h1 className="font-display text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
             {generatedData.campaign_title}
           </h1>
         </div>
 
-        {/* Action button toolbar */}
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
             onClick={onEditPrompt}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl studio-card hover:border-emerald-500/35 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-all cursor-pointer"
           >
-            <Edit3 className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-            <span>Edit Parameters</span>
+            <Edit3 className="w-3.5 h-3.5 text-slate-400" />
+            <span>Edit Prompt</span>
           </button>
 
           <button
             type="button"
             onClick={handleRegenerateClick}
             disabled={isRegenerating}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl studio-card hover:border-emerald-500/35 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
           >
-            <RotateCcw
-              className={`w-3.5 h-3.5 text-slate-500 dark:text-slate-400 ${
-                isRegenerating ? 'animate-spin' : ''
-              }`}
-            />
-            <span>{isRegenerating ? 'Regenerating...' : 'Generate Again'}</span>
+            <RotateCcw className={`w-3.5 h-3.5 text-slate-400 ${isRegenerating ? 'animate-spin' : ''}`} />
+            <span>{isRegenerating ? 'Rendering...' : 'Generate Variation'}</span>
           </button>
 
           <button
             type="button"
             onClick={handleSaveToHistory}
             disabled={isSaved || isSaving}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
               isSaved
-                ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 cursor-default'
-                : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50'
+                ? 'bg-slate-900/[0.05] dark:bg-white/[0.06] text-slate-500 dark:text-slate-400 border border-slate-900/10 dark:border-white/10 cursor-default'
+                : 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/20'
             }`}
           >
             {isSaved ? (
               <>
-                <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>Saved to History</span>
+                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Saved to Gallery</span>
               </>
             ) : (
               <>
-                <Bookmark className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>{isSaving ? 'Saving...' : 'Save to History'}</span>
+                <Bookmark className="w-3.5 h-3.5 text-emerald-500" />
+                <span>{isSaving ? 'Saving...' : 'Save to Gallery'}</span>
               </>
             )}
           </button>
 
-          <button
-            type="button"
+          <MagneticButton
             onClick={handleDownload}
-            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm shadow-emerald-600/30 transition-all cursor-pointer"
+            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-950/25 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Download PNG</span>
-          </button>
+          </MagneticButton>
         </div>
       </div>
 
-      {/* Main Grid: Preview + Campaign Specs */}
+      {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left column: Large Image Preview */}
-        <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-sm space-y-4 transition-colors">
-          <div className="relative group rounded-2xl overflow-hidden bg-slate-950 flex items-center justify-center min-h-[380px] max-h-[640px]">
-            <img
+        {/* Studio Image Darkroom Viewport */}
+        <SpotlightCard className="lg:col-span-7 p-4 sm:p-5 space-y-4">
+          <div className="relative group rounded-2xl overflow-hidden bg-[#060908] border border-white/10 flex items-center justify-center min-h-[380px] max-h-[640px]">
+            <StudioImage
               src={generatedData.image_url}
               alt={generatedData.campaign_title}
-              className="w-full h-auto object-contain max-h-[600px] rounded-lg transition-transform duration-300 group-hover:scale-[1.01]"
               loading="eager"
+              className="w-full h-auto object-contain max-h-[600px] transition-transform duration-500 group-hover:scale-[1.015]"
             />
 
             <div className="absolute bottom-3 right-3 flex items-center gap-2">
               {generatedData.seed && (
-                <div className="px-2 py-0.5 bg-slate-900/80 backdrop-blur-md rounded text-[10px] font-mono text-emerald-300 border border-white/10">
+                <div className="px-2.5 py-1 bg-black/75 backdrop-blur-md rounded-lg text-[10px] font-mono text-emerald-300 border border-white/10">
                   Seed: {generatedData.seed}
                 </div>
               )}
-              <div className="px-2.5 py-1 bg-slate-900/80 backdrop-blur-md rounded-md text-[11px] font-mono text-white/90 border border-white/10">
+              <div className="px-2.5 py-1 bg-black/75 backdrop-blur-md rounded-lg text-[11px] font-mono text-white/90 border border-white/10">
                 {generatedData.width} × {generatedData.height} PNG
               </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-2 px-1">
+          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-1">
             <span className="flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              Verified Lossless PNG Format
+              <ShieldCheck className="w-4 h-4 text-emerald-500" />
+              Verified Lossless PNG
             </span>
-            <span>Aspect Ratio: {generatedData.aspect_ratio || '1:1'}</span>
+            <span className="font-mono">Aspect Ratio: {generatedData.aspect_ratio || '1:1'}</span>
           </div>
-        </div>
+        </SpotlightCard>
 
-        {/* Right column: Campaign Specs & Prompt Details */}
-        <div className="lg:col-span-5 space-y-6">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-5 transition-colors">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-3">
+        {/* Metadata & Specs */}
+        <div className="lg:col-span-5 space-y-5">
+          <SpotlightCard className="p-6 space-y-5">
+            <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-slate-900 dark:text-white border-b border-slate-900/[0.06] dark:border-white/[0.06] pb-3">
               Campaign Specifications
             </h3>
 
-            <div className="space-y-4 text-sm">
-              <div className="flex items-start justify-between">
-                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                  <Tag className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Sector:
+            <div className="space-y-3.5 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2 text-xs">
+                  <Tag className="w-3.5 h-3.5 text-emerald-500" /> Sector
                 </span>
-                <span className="font-semibold text-right bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 px-2.5 py-0.5 rounded-full text-xs">
+                <span className="font-semibold bg-emerald-500/12 text-emerald-700 dark:text-emerald-300 px-2.5 py-0.5 rounded-full text-xs border border-emerald-500/20">
                   {generatedData.category}
                 </span>
               </div>
 
-              <div className="flex items-start justify-between">
-                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                  <Palette className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Style:
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2 text-xs">
+                  <Palette className="w-3.5 h-3.5 text-emerald-500" /> Style
                 </span>
-                <span className="font-semibold text-slate-900 dark:text-white text-right">
+                <span className="font-semibold text-slate-900 dark:text-white text-xs">
                   {generatedData.image_style}
                 </span>
               </div>
 
-              <div className="flex items-start justify-between">
-                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                  <Users className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Target Audience:
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2 text-xs">
+                  <Users className="w-3.5 h-3.5 text-emerald-500" /> Audience
                 </span>
-                <span className="font-semibold text-slate-900 dark:text-white text-right">
+                <span className="font-semibold text-slate-900 dark:text-white text-xs">
                   {generatedData.target_audience}
                 </span>
               </div>
 
-              <div className="flex items-start justify-between">
-                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                  <Cpu className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Model / Mode:
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2 text-xs">
+                  <Cpu className="w-3.5 h-3.5 text-emerald-500" /> Engine
                 </span>
-                <span className="font-semibold text-slate-900 dark:text-white text-right text-xs">
+                <span className="font-mono text-slate-900 dark:text-white text-xs text-right">
                   {generatedData.model || 'FLUX.1 Dev (Q4_K_S)'}
                   {generatedData.preset_label ? ` • ${generatedData.preset_label}` : ''}
                 </span>
               </div>
 
               {generatedData.generation_time_sec != null && (
-                <div className="flex items-start justify-between">
-                  <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Render Time:
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2 text-xs">
+                    <Clock className="w-3.5 h-3.5 text-emerald-500" /> Render Time
                   </span>
-                  <span className="font-mono text-xs text-slate-800 dark:text-slate-200 text-right">
+                  <span className="font-mono text-xs text-slate-800 dark:text-slate-200">
                     {generatedData.generation_time_sec}s
                     {generatedData.model_load_time_sec ? ` (load ${generatedData.model_load_time_sec}s)` : ''}
                   </span>
                 </div>
               )}
 
-              <div className="flex items-start justify-between">
-                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Date:
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2 text-xs">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-500" /> Date
                 </span>
-                <span className="font-medium text-slate-700 dark:text-slate-300 text-right">
+                <span className="font-mono text-xs text-slate-700 dark:text-slate-300">
                   {formattedDate}
                 </span>
               </div>
 
               {generatedData.seed && (
-                <div className="flex items-start justify-between">
-                  <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                    <Dices className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Seed:
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-slate-500 dark:text-slate-400 flex items-center gap-2 text-xs">
+                    <Dices className="w-3.5 h-3.5 text-emerald-500" /> Seed
                   </span>
-                  <span className="font-mono text-xs text-slate-800 dark:text-slate-200 text-right">
+                  <span className="font-mono text-xs text-slate-800 dark:text-slate-200">
                     {generatedData.seed}
                   </span>
                 </div>
               )}
             </div>
 
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
-              <span className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+            <div className="pt-3 border-t border-slate-900/[0.06] dark:border-white/[0.06]">
+              <span className="block text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
                 Campaign Narrative
               </span>
-              <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-100 dark:border-slate-700/60">
+              <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-900/[0.03] dark:bg-white/[0.03] p-3.5 rounded-xl border border-slate-900/[0.06] dark:border-white/[0.06]">
                 {generatedData.description}
               </p>
             </div>
-          </div>
+          </SpotlightCard>
 
-          {/* AI Prompt Engineering Accordion */}
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
+          <SpotlightCard className="overflow-hidden">
             <button
               type="button"
               onClick={() => setShowPromptDetails(!showPromptDetails)}
-              className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+              className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-slate-900/[0.02] dark:hover:bg-white/[0.03] transition-colors cursor-pointer"
             >
-              <div className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
-                <FileCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span>FLUX.1 Dev Prompt &amp; Inference Details</span>
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider font-mono text-slate-900 dark:text-white">
+                <FileCheck className="w-4 h-4 text-emerald-500" />
+                <span>FLUX.1 Dev Prompt &amp; Specs</span>
               </div>
               {showPromptDetails ? (
                 <ChevronUp className="w-4 h-4 text-slate-400" />
@@ -329,41 +323,20 @@ export default function ResultPage({
             </button>
 
             {showPromptDetails && (
-              <div className="px-6 pb-6 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-4 animate-in">
-                <div>
-                  <span className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                    Prompt Passed to FLUX.1 Dev
-                  </span>
-                  <p className="text-xs font-mono text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 leading-relaxed">
-                    {generatedData.generated_prompt}
-                  </p>
-                </div>
+              <div className="px-6 pb-6 pt-2 border-t border-slate-900/[0.06] dark:border-white/[0.06] space-y-3 animate-modal">
+                <p className="text-xs font-mono text-slate-700 dark:text-slate-300 bg-slate-900/[0.03] dark:bg-black/40 p-3 rounded-xl border border-slate-900/[0.06] dark:border-white/[0.08] leading-relaxed">
+                  {generatedData.generated_prompt}
+                </p>
 
                 {generatedData.steps && (
-                  <div className="text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 font-mono">
+                  <div className="text-[11px] font-mono text-slate-600 dark:text-slate-400 bg-slate-900/[0.03] dark:bg-white/[0.03] p-2.5 rounded-xl">
                     Steps: {generatedData.steps} • FluxGuidance: {generatedData.guidance_scale} •{' '}
                     {generatedData.sampler}/{generatedData.scheduler}
                   </div>
                 )}
               </div>
             )}
-          </div>
-
-          <div className="p-4 rounded-2xl bg-gradient-to-tr from-emerald-50 to-teal-50 dark:from-emerald-950/40 dark:to-teal-950/40 border border-emerald-200/80 dark:border-emerald-800/40 flex items-center justify-between gap-4">
-            <div className="text-xs text-emerald-900 dark:text-emerald-200 space-y-0.5">
-              <span className="font-bold block">Production-Ready Utility Asset</span>
-              <span className="text-emerald-700 dark:text-emerald-400">
-                Suitable for posters, social media, and sustainability outreach.
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={handleDownload}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-xs transition-colors shrink-0 cursor-pointer"
-            >
-              Export PNG
-            </button>
-          </div>
+          </SpotlightCard>
         </div>
       </div>
     </div>

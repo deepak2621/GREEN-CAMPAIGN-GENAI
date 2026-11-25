@@ -13,6 +13,7 @@ import { fetchHistory, checkHealth } from '../services/api';
 import { useAuth } from '../context/authContextValue';
 import { CATEGORIES } from '../data/campaignOptions';
 import SystemMonitorCard from '../components/SystemMonitorCard';
+import { Reveal, SpotlightCard, MagneticButton, StudioImage } from '../components/MotionPrimitives';
 
 export default function DashboardPage({ setActivePage, onSelectForRegenerate }) {
   const { user } = useAuth();
@@ -50,20 +51,20 @@ export default function DashboardPage({ setActivePage, onSelectForRegenerate }) 
   const totalCampaigns = historyItems.length;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10 animate-in">
-      {/* Welcome Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-900 via-slate-900 to-emerald-950 p-8 sm:p-12 text-white border border-emerald-800/40 shadow-xl">
-        <div className="relative z-10 max-w-3xl space-y-4">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 animate-in">
+      {/* Studio Operations Hero Card */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#071f17] via-[#0b1411] to-[#050807] p-8 sm:p-11 text-white border border-emerald-500/20 shadow-2xl">
+        <div className="relative z-10 max-w-3xl space-y-5">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-semibold tracking-wide">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 text-[11px] font-mono font-medium">
               <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-              <span>AI Campaign Operations Center</span>
+              <span>AI Campaign Operations</span>
             </div>
             {user && (
               <button
                 type="button"
                 onClick={() => setActivePage('profile')}
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 text-xs font-medium text-slate-200 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.07] hover:bg-white/[0.12] border border-white/10 text-xs font-medium text-slate-200 transition-colors cursor-pointer"
               >
                 <User className="w-3.5 h-3.5 text-emerald-400" />
                 <span>{user.full_name}</span>
@@ -73,28 +74,27 @@ export default function DashboardPage({ setActivePage, onSelectForRegenerate }) 
             )}
           </div>
 
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight">
-            {user ? `Welcome, ${user.full_name.split(' ')[0]}` : 'Sustainability Visuals Dashboard'}
+          <h1 className="font-display text-3xl sm:text-4xl lg:text-[2.75rem] font-bold tracking-tight leading-tight">
+            {user ? `Welcome back, ${user.full_name.split(' ')[0]}` : 'Sustainability Visuals Studio'}
           </h1>
 
           <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-2xl">
-            Monitor public education campaigns, oversee generated FLUX.1 Dev visuals, and deploy
-            high-impact environmental messaging across your utility service area.
+            Monitor campaign output, inspect GPU inference telemetry, and launch new FLUX.1 Dev
+            sustainability visuals across your outreach channels.
           </p>
 
-          <div className="flex flex-wrap items-center gap-3 pt-2">
-            <button
-              type="button"
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            <MagneticButton
               onClick={() => {
                 setActivePage('generator');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className="flex items-center gap-2 px-6 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-sm transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
+              className="flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-sm shadow-lg shadow-emerald-950/30 cursor-pointer"
             >
               <Sparkles className="w-4 h-4" />
-              <span>Launch AI Generator</span>
-              <ArrowRight className="w-4 h-4 ml-1" />
-            </button>
+              <span>Open Studio</span>
+              <ArrowRight className="w-4 h-4" />
+            </MagneticButton>
 
             <button
               type="button"
@@ -102,90 +102,95 @@ export default function DashboardPage({ setActivePage, onSelectForRegenerate }) 
                 setActivePage('explore');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className="flex items-center gap-2 px-5 py-3.5 bg-white/10 hover:bg-white/15 text-white font-bold rounded-xl text-sm border border-white/15 transition-all cursor-pointer"
+              className="flex items-center gap-2 px-5 py-3 bg-white/[0.08] hover:bg-white/[0.14] text-white font-semibold rounded-xl text-sm border border-white/15 transition-all cursor-pointer"
             >
               <Compass className="w-4 h-4 text-emerald-400" />
-              <span>Browse 8 Templates</span>
+              <span>Explore Creations</span>
             </button>
           </div>
         </div>
 
-        <div className="absolute right-0 bottom-0 translate-x-12 translate-y-12 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div
+          aria-hidden="true"
+          className="absolute right-0 bottom-0 translate-x-12 translate-y-12 w-96 h-96 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none"
+        />
       </div>
 
-      {/* 4 Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center gap-4 transition-colors">
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-            <History className="w-6 h-6" />
+      {/* 4 KPI Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <SpotlightCard interactive className="p-5 flex items-center gap-4">
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+            <History className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 block">
-              Total Saved Visuals
+            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+              Saved Visuals
             </span>
-            <span className="text-2xl font-extrabold text-slate-900 dark:text-white">
+            <span className="text-2xl font-bold text-slate-900 dark:text-white font-display">
               {loading ? '...' : totalCampaigns}
             </span>
           </div>
-        </div>
+        </SpotlightCard>
 
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center gap-4 transition-colors">
-          <div className="w-12 h-12 rounded-xl bg-teal-50 dark:bg-teal-950/50 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
-            <Layers className="w-6 h-6" />
+        <SpotlightCard interactive className="p-5 flex items-center gap-4">
+          <div className="w-11 h-11 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
+            <Layers className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 block">
-              Active Categories
+            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+              Active Sectors
             </span>
-            <span className="text-2xl font-extrabold text-slate-900 dark:text-white">
-              7 Sectors
+            <span className="text-2xl font-bold text-slate-900 dark:text-white font-display">
+              7 Domains
             </span>
           </div>
-        </div>
+        </SpotlightCard>
 
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center gap-4 transition-colors">
-          <div className="w-12 h-12 rounded-xl bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
-            <Cpu className="w-6 h-6" />
+        <SpotlightCard interactive className="p-5 flex items-center gap-4">
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+            <Cpu className="w-5 h-5" />
           </div>
-          <div>
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 block">
-              AI Model
+          <div className="min-w-0">
+            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+              Diffusion Engine
             </span>
-            <span className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mt-0.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+            <span className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mt-0.5 truncate">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
               {healthStatus.model || 'FLUX.1 Dev (Q4_K_S GGUF)'}
             </span>
           </div>
-        </div>
+        </SpotlightCard>
 
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center gap-4 transition-colors">
-          <div className="w-12 h-12 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-            <ShieldCheck className="w-6 h-6" />
+        <SpotlightCard interactive className="p-5 flex items-center gap-4">
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+            <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 block">
-              Output Standards
+            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+              Export Format
             </span>
-            <span className="text-xl font-extrabold text-slate-900 dark:text-white">
+            <span className="text-xl font-bold text-slate-900 dark:text-white font-display">
               Lossless PNG
             </span>
           </div>
-        </div>
+        </SpotlightCard>
       </div>
 
-      {/* Real-time GPU / VRAM / RAM & Inference Performance Monitor */}
-      <SystemMonitorCard />
+      {/* Real-time Telemetry */}
+      <Reveal>
+        <SystemMonitorCard />
+      </Reveal>
 
-      {/* Main Grid: Category Overview + Recent Generations */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        <div className="lg:col-span-8 space-y-5">
+      {/* Main Content Split: Recent Generations + Sector Coverage */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 items-start">
+        <div className="lg:col-span-8 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                Recent Campaign Visuals
+              <h2 className="font-display text-xl font-bold text-slate-900 dark:text-white">
+                Recent Studio Visuals
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Archived generations stored in local SQLite database
+                Archived generations persisted in local SQLite
               </p>
             </div>
 
@@ -195,27 +200,34 @@ export default function DashboardPage({ setActivePage, onSelectForRegenerate }) 
                 setActivePage('history');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+              className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
             >
-              <span>View All History</span>
+              <span>Open Full Gallery</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
           {loading ? (
-            <div className="py-20 text-center space-y-2">
-              <div className="w-7 h-7 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-              <p className="text-xs text-slate-400">Loading campaign records...</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {[1, 2, 3, 4].map((n) => (
+                <div key={n} className="studio-card rounded-2xl overflow-hidden p-4 space-y-3">
+                  <div className="aspect-video rounded-xl studio-skeleton" />
+                  <div className="h-4 w-2/3 rounded studio-skeleton" />
+                  <div className="h-3 w-full rounded studio-skeleton" />
+                </div>
+              ))}
             </div>
           ) : historyItems.length === 0 ? (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-8 text-center space-y-3 transition-colors">
-              <History className="w-10 h-10 text-slate-400 mx-auto" />
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                No Campaigns Generated Yet
+            <SpotlightCard className="p-10 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-500 mx-auto">
+                <History className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                No Saved Campaigns Yet
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-                Generate your first sustainability visual to see it showcased here and archived in
-                your history.
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
+                Generate your first environmental visual in the Studio to showcase and archive it
+                here.
               </p>
               <button
                 type="button"
@@ -223,31 +235,32 @@ export default function DashboardPage({ setActivePage, onSelectForRegenerate }) 
                   setActivePage('generator');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-xl cursor-pointer inline-flex items-center gap-1.5"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Create Campaign Visual</span>
+                <span>Create First Visual</span>
               </button>
-            </div>
+            </SpotlightCard>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {historyItems.slice(0, 4).map((item) => (
-                <div
+                <SpotlightCard
                   key={item.id}
-                  className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs hover:shadow-md transition-all group flex flex-col justify-between"
+                  interactive
+                  className="overflow-hidden group flex flex-col justify-between"
                 >
                   <div className="relative aspect-video bg-slate-950 overflow-hidden flex items-center justify-center">
                     {item.image_exists !== false ? (
-                      <img
+                      <StudioImage
                         src={item.image_url}
                         alt={item.campaign_title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        loading="lazy"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                     ) : (
                       <div className="text-xs text-slate-500">Image file archived</div>
                     )}
-                    <span className="absolute top-2.5 left-2.5 px-2.5 py-0.5 text-[10px] font-bold bg-slate-950/80 backdrop-blur-md text-emerald-400 rounded-full border border-white/10">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
+                    <span className="absolute top-3 left-3 px-2.5 py-0.5 text-[10px] font-mono font-medium bg-black/60 backdrop-blur-md text-emerald-300 rounded-full border border-white/15">
                       {item.category}
                     </span>
                   </div>
@@ -262,67 +275,69 @@ export default function DashboardPage({ setActivePage, onSelectForRegenerate }) 
                       </p>
                     </div>
 
-                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px]">
+                    <div className="pt-2.5 border-t border-slate-900/[0.06] dark:border-white/[0.06] flex items-center justify-between text-[11px]">
                       <span className="text-slate-400">{item.image_style}</span>
                       <button
                         type="button"
                         onClick={() => onSelectForRegenerate(item)}
-                        className="font-bold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                        className="font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
                       >
-                        Remix Visual →
+                        Remix in Studio →
                       </button>
                     </div>
                   </div>
-                </div>
+                </SpotlightCard>
               ))}
             </div>
           )}
         </div>
 
-        <div className="lg:col-span-4 space-y-5">
+        <div className="lg:col-span-4 space-y-4">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Sector Distribution</h2>
+            <h2 className="font-display text-xl font-bold text-slate-900 dark:text-white">
+              Sector Distribution
+            </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Coverage across utility sustainability focus areas
+              Coverage across sustainability themes
             </p>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4 transition-colors">
+          <SpotlightCard className="p-6 space-y-4">
             {CATEGORIES.map((cat) => {
               const count = categoryCounts[cat] || 0;
               const percent = totalCampaigns > 0 ? Math.round((count / totalCampaigns) * 100) : 0;
               return (
                 <div key={cat} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs font-semibold">
+                  <div className="flex items-center justify-between text-xs font-medium">
                     <span className="text-slate-700 dark:text-slate-300">{cat}</span>
-                    <span className="text-slate-400 dark:text-slate-500">
-                      {count} visuals ({percent}%)
+                    <span className="font-mono text-slate-400 dark:text-slate-500">
+                      {count} ({percent}%)
                     </span>
                   </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                  <div className="w-full bg-slate-900/[0.06] dark:bg-white/[0.06] rounded-full h-1.5 overflow-hidden">
                     <div
-                      className="bg-emerald-600 dark:bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
+                      className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
                       style={{ width: `${percent > 0 ? percent : 4}%` }}
-                    ></div>
+                    />
                   </div>
                 </div>
               );
             })}
 
-            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+            <div className="pt-4 border-t border-slate-900/[0.06] dark:border-white/[0.06]">
               <button
                 type="button"
                 onClick={() => {
                   setActivePage('generator');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 rounded-xl text-xs font-bold transition-colors cursor-pointer border border-emerald-200 dark:border-emerald-800/40"
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-semibold transition-colors cursor-pointer border border-emerald-500/25"
               >
-                <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>Create Visual for Any Sector</span>
+                <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Generate New Visual</span>
               </button>
             </div>
-          </div>
+          </SpotlightCard>
         </div>
       </div>
     </div>

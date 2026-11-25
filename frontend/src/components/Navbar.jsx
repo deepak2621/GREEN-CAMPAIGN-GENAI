@@ -7,7 +7,6 @@ import {
   History,
   Menu,
   X,
-  Cpu,
   Sun,
   Moon,
   User,
@@ -45,7 +44,6 @@ export default function Navbar({
     });
   }, []);
 
-  // Close account dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
@@ -59,9 +57,9 @@ export default function Navbar({
   const navItems = [
     { id: 'landing', label: 'Home', icon: Leaf },
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'generator', label: 'AI Generator', icon: Sparkles },
+    { id: 'generator', label: 'Studio', icon: Sparkles },
     { id: 'explore', label: 'Explore', icon: Compass },
-    { id: 'history', label: 'History', icon: History },
+    { id: 'history', label: 'Gallery', icon: History },
   ];
 
   const handleNavClick = (pageId) => {
@@ -94,35 +92,38 @@ export default function Navbar({
   const modelReady = healthStatus.provider_ready !== false && healthStatus.status !== 'offline';
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-emerald-100 dark:border-slate-800 shadow-xs transition-colors duration-300">
+    <header className="sticky top-0 z-40 studio-surface-glass border-b border-slate-900/10 dark:border-white/[0.08] transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between gap-3 h-20">
-          {/* Logo */}
+        <div className="flex items-center justify-between gap-3 h-[72px]">
+          {/* Premium Brand Logo */}
           <button
             type="button"
             onClick={() => handleNavClick('landing')}
-            className="flex items-center gap-3 cursor-pointer group text-left shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-xl"
+            className="flex items-center gap-3 cursor-pointer group text-left shrink-0 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
           >
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-600/20 group-hover:scale-105 transition-transform duration-200">
-              <Leaf className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.2]" />
+            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-800 flex items-center justify-center text-white shadow-md shadow-emerald-950/25 border border-emerald-300/30 group-hover:scale-105 transition-transform duration-200">
+              <Leaf className="w-5 h-5 stroke-[2.1]" />
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold text-lg sm:text-xl tracking-tight text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+              <div className="flex items-center gap-2">
+                <span className="font-display font-bold text-base sm:text-lg tracking-tight text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                   Green Campaign
                 </span>
-                <span className="px-1.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 rounded border border-emerald-200/50 dark:border-emerald-800/40">
+                <span className="px-1.5 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-widest bg-emerald-500/12 text-emerald-700 dark:text-emerald-300 rounded-md border border-emerald-500/25">
                   AI
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">
-                Sustainability Education Visual Generator
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">
+                Environmental Visual Studio
               </p>
             </div>
           </button>
 
-          {/* Desktop Nav Items */}
-          <nav className="hidden lg:flex items-center gap-1 bg-slate-100/80 dark:bg-slate-800/80 p-1.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60 transition-colors">
+          {/* Desktop Navigation Rail */}
+          <nav
+            aria-label="Primary Navigation"
+            className="hidden lg:flex items-center gap-1 bg-slate-900/[0.04] dark:bg-white/[0.04] p-1 rounded-2xl border border-slate-900/[0.07] dark:border-white/[0.07]"
+          >
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activePage === item.id;
@@ -131,39 +132,40 @@ export default function Navbar({
                   key={item.id}
                   type="button"
                   onClick={() => handleNavClick(item.id)}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer ${
+                  className={`relative flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
                     isActive
-                      ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-xs shadow-slate-200 dark:shadow-none'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-700/50'
+                      ? 'bg-white dark:bg-[#131c18] text-emerald-700 dark:text-emerald-300 shadow-xs border border-slate-900/[0.06] dark:border-emerald-500/25'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/[0.05] border border-transparent'
                   }`}
                 >
                   <Icon
-                    className={`w-4 h-4 ${
+                    className={`w-3.5 h-3.5 transition-colors ${
                       isActive
                         ? 'text-emerald-600 dark:text-emerald-400'
                         : 'text-slate-400 dark:text-slate-500'
                     }`}
                   />
-                  {item.label}
+                  <span>{item.label}</span>
+                  {isActive && (
+                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-emerald-500" />
+                  )}
                 </button>
               );
             })}
           </nav>
 
-          {/* Right utilities: Model Badge + Account Menu + Mobile Menu + Top-Right Theme Toggle */}
+          {/* Right Controls: Status Badge + Auth/Profile + Mobile Drawer + Top-Right Theme Toggle */}
           <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-            {/* Provider status badge */}
-            <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/40 rounded-full text-xs font-medium text-emerald-800 dark:text-emerald-300">
+            {/* Engine indicator */}
+            <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/[0.08] border border-emerald-500/20 text-[11px] font-mono font-medium text-emerald-800 dark:text-emerald-300">
               <span
-                className={`w-2 h-2 rounded-full ${
+                className={`w-1.5 h-1.5 rounded-full ${
                   modelReady ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
                 }`}
-              ></span>
-              <Cpu className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span className="font-bold">FLUX.1 Dev Q4</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/60 font-semibold text-emerald-800 dark:text-emerald-300">
-                {healthStatus.model_status || (modelReady ? 'Ready' : 'Offline')}
-              </span>
+              />
+              <span>FLUX.1 Dev</span>
+              <span className="text-emerald-600/70 dark:text-emerald-400/70">•</span>
+              <span>{healthStatus.model_status || (modelReady ? 'Ready' : 'Offline')}</span>
             </div>
 
             {/* Auth Actions / Account Menu */}
@@ -174,7 +176,7 @@ export default function Navbar({
                   onClick={() => setAccountMenuOpen((prev) => !prev)}
                   aria-expanded={accountMenuOpen}
                   aria-label="Open account menu"
-                  className="flex items-center gap-2 pl-2 pr-2.5 sm:pr-3 py-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200/70 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer"
+                  className="flex items-center gap-2 pl-1.5 pr-2.5 sm:pr-3 py-1.5 rounded-xl bg-slate-900/[0.04] dark:bg-white/[0.05] hover:bg-slate-900/[0.08] dark:hover:bg-white/[0.09] border border-slate-900/[0.08] dark:border-white/[0.09] transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                 >
                   {user.avatar_url ? (
                     <img
@@ -183,19 +185,23 @@ export default function Navbar({
                       className="w-7 h-7 rounded-lg object-cover"
                     />
                   ) : (
-                    <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-emerald-600 to-teal-500 text-white text-xs font-bold flex items-center justify-center">
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-700 text-white text-xs font-bold flex items-center justify-center">
                       {userInitials}
                     </div>
                   )}
-                  <span className="hidden sm:inline text-xs font-bold text-slate-800 dark:text-slate-100 max-w-[110px] truncate">
+                  <span className="hidden sm:inline text-xs font-semibold text-slate-800 dark:text-slate-100 max-w-[110px] truncate">
                     {user.full_name}
                   </span>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 text-slate-500 dark:text-slate-400 transition-transform duration-200 ${
+                      accountMenuOpen ? 'rotate-180' : ''
+                    }`}
+                  />
                 </button>
 
                 {accountMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl py-2 z-50 animate-in">
-                    <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 space-y-1">
+                  <div className="absolute right-0 mt-2.5 w-64 rounded-2xl bg-white dark:bg-[#0f1613] border border-slate-900/10 dark:border-white/10 shadow-2xl py-2 z-50 animate-modal">
+                    <div className="px-4 py-3 border-b border-slate-100 dark:border-white/[0.07] space-y-1">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
                           {user.full_name}
@@ -213,7 +219,7 @@ export default function Navbar({
                       <button
                         type="button"
                         onClick={() => handleNavClick('dashboard')}
-                        className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                        className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
                       >
                         <LayoutDashboard className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                         <span>Campaign Dashboard</span>
@@ -222,18 +228,18 @@ export default function Navbar({
                       <button
                         type="button"
                         onClick={() => handleNavClick('profile')}
-                        className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                        className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
                       >
                         <User className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                         <span>Profile &amp; Settings</span>
                       </button>
                     </div>
 
-                    <div className="pt-1 mt-1 border-t border-slate-100 dark:border-slate-800 px-1.5">
+                    <div className="pt-1 mt-1 border-t border-slate-100 dark:border-white/[0.07] px-1.5">
                       <button
                         type="button"
                         onClick={handleLogout}
-                        className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+                        className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
                       >
                         <LogOut className="w-4 h-4" />
                         <span>Sign Out</span>
@@ -247,7 +253,7 @@ export default function Navbar({
                 <button
                   type="button"
                   onClick={() => handleNavClick('login')}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-900/[0.05] dark:hover:bg-white/[0.06] border border-slate-900/10 dark:border-white/10 transition-all cursor-pointer"
                 >
                   <LogIn className="w-3.5 h-3.5" />
                   <span>Sign In</span>
@@ -255,7 +261,7 @@ export default function Navbar({
                 <button
                   type="button"
                   onClick={() => handleNavClick('signup')}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-600/25 transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm shadow-emerald-950/20 hover:-translate-y-0.5 transition-all cursor-pointer"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
                   <span>Sign Up</span>
@@ -267,7 +273,7 @@ export default function Navbar({
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl lg:hidden cursor-pointer"
+              className="p-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-900/[0.05] dark:hover:bg-white/[0.06] rounded-xl lg:hidden cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
               aria-label="Toggle navigation menu"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -279,15 +285,15 @@ export default function Navbar({
               onClick={toggleTheme}
               aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="relative inline-flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 text-slate-700 dark:text-amber-300 hover:text-emerald-600 dark:hover:text-amber-200 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 shadow-xs transition-all duration-300 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 shrink-0"
+              className="relative inline-flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900/[0.04] dark:bg-white/[0.06] text-slate-700 dark:text-amber-300 hover:text-emerald-600 dark:hover:text-emerald-300 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/15 border border-slate-900/10 dark:border-white/10 transition-all duration-300 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 shrink-0"
             >
               <Sun
-                className={`w-[18px] h-[18px] text-amber-400 transition-all duration-300 absolute ${
+                className={`w-[17px] h-[17px] text-amber-400 transition-all duration-300 absolute ${
                   theme === 'dark' ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 -rotate-90 scale-50'
                 }`}
               />
               <Moon
-                className={`w-[18px] h-[18px] text-slate-700 transition-all duration-300 absolute ${
+                className={`w-[17px] h-[17px] text-slate-700 transition-all duration-300 absolute ${
                   theme === 'dark' ? 'opacity-0 rotate-90 scale-50' : 'opacity-100 rotate-0 scale-100'
                 }`}
               />
@@ -298,7 +304,7 @@ export default function Navbar({
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="lg:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 pt-3 pb-6 space-y-2 transition-colors">
+        <div className="lg:hidden border-t border-slate-900/10 dark:border-white/[0.08] bg-white/95 dark:bg-[#0b100e]/95 backdrop-blur-xl px-4 pt-3 pb-6 space-y-2 animate-modal">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activePage === item.id;
@@ -309,15 +315,13 @@ export default function Navbar({
                 onClick={() => handleNavClick(item.id)}
                 className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800/40'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/25'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-900/[0.04] dark:hover:bg-white/[0.05]'
                 }`}
               >
                 <Icon
-                  className={`w-5 h-5 ${
-                    isActive
-                      ? 'text-emerald-600 dark:text-emerald-400'
-                      : 'text-slate-400 dark:text-slate-500'
+                  className={`w-4 h-4 ${
+                    isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'
                   }`}
                 />
                 {item.label}
@@ -326,7 +330,7 @@ export default function Navbar({
           })}
 
           {isAuthenticated && user ? (
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+            <div className="pt-2 border-t border-slate-900/10 dark:border-white/[0.08] space-y-1.5">
               <div className="px-4 py-2 text-xs">
                 <p className="font-bold text-slate-900 dark:text-white">{user.full_name}</p>
                 <p className="text-slate-500 dark:text-slate-400">{user.email}</p>
@@ -334,9 +338,9 @@ export default function Navbar({
               <button
                 type="button"
                 onClick={() => handleNavClick('profile')}
-                className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-900/[0.04] dark:hover:bg-white/[0.05] cursor-pointer"
               >
-                <User className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <User className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <span>Profile &amp; Settings</span>
               </button>
               <button
@@ -344,16 +348,16 @@ export default function Navbar({
                 onClick={handleLogout}
                 className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
               >
-                <LogOut className="w-5 h-5" />
+                <LogOut className="w-4 h-4" />
                 <span>Sign Out</span>
               </button>
             </div>
           ) : (
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2">
+            <div className="pt-2 border-t border-slate-900/10 dark:border-white/[0.08] grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => handleNavClick('login')}
-                className="py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer"
+                className="py-2.5 px-4 rounded-xl border border-slate-900/15 dark:border-white/15 text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer"
               >
                 Sign In
               </button>
@@ -367,10 +371,10 @@ export default function Navbar({
             </div>
           )}
 
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-2">
-            <span>AI Diffusion Engine</span>
-            <span className="flex items-center gap-1.5 font-medium text-emerald-700 dark:text-emerald-400">
-              <span className={`w-2 h-2 rounded-full ${modelReady ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+          <div className="pt-3 border-t border-slate-900/10 dark:border-white/[0.08] flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-2">
+            <span>Diffusion Engine</span>
+            <span className="flex items-center gap-1.5 font-mono font-medium text-emerald-700 dark:text-emerald-400">
+              <span className={`w-2 h-2 rounded-full ${modelReady ? 'bg-emerald-500' : 'bg-amber-500'}`} />
               {healthStatus.model || 'FLUX.1 Dev (Q4_K_S GGUF)'}
             </span>
           </div>
