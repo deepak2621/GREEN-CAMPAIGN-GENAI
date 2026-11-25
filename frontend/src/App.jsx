@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Loader2, Leaf } from 'lucide-react';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
+import { useAuth } from './context/authContextValue';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Toast from './components/Toast';
@@ -22,10 +23,12 @@ const INITIAL_FORM_DATA = {
   campaign_title: '',
   description: '',
   category: 'Water Conservation',
-  image_style: '3D Illustration',
+  image_style: 'Realistic Photography',
   target_audience: 'General Public',
   aspect_ratio: '1:1',
+  preset: 'fast',
   additional_instructions: '',
+  custom_prompt: '',
   seed: '',
   custom_negative_prompt: ''
 };
@@ -170,7 +173,9 @@ function AppContent() {
       image_style: example.image_style,
       target_audience: example.target_audience,
       aspect_ratio: example.aspect_ratio || '1:1',
+      preset: 'fast',
       additional_instructions: example.additional_instructions || '',
+      custom_prompt: '',
       seed: '',
       custom_negative_prompt: ''
     });
@@ -192,7 +197,9 @@ function AppContent() {
       image_style: historyItem.image_style,
       target_audience: historyItem.target_audience,
       aspect_ratio: historyItem.aspect_ratio || '1:1',
+      preset: 'fast',
       additional_instructions: '',
+      custom_prompt: '',
       seed: historyItem.seed || '',
       custom_negative_prompt: ''
     });

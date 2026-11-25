@@ -18,7 +18,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { checkHealth } from '../services/api';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/authContextValue';
 
 export default function Navbar({
   activePage,
@@ -34,7 +34,8 @@ export default function Navbar({
   const [healthStatus, setHealthStatus] = useState({
     status: 'checking',
     provider_ready: true,
-    provider: 'diffusion',
+    model: 'FLUX.1 Dev (Q4_K_S GGUF)',
+    model_status: 'Checking',
   });
   const menuRef = useRef(null);
 
@@ -90,21 +91,24 @@ export default function Navbar({
         .slice(0, 2)
     : '';
 
+  const modelReady = healthStatus.provider_ready !== false && healthStatus.status !== 'offline';
+
   return (
-    <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-emerald-100 dark:border-slate-800 shadow-xs transition-colors duration-200">
+    <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-emerald-100 dark:border-slate-800 shadow-xs transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+        <div className="flex items-center justify-between gap-3 h-20">
           {/* Logo */}
-          <div
+          <button
+            type="button"
             onClick={() => handleNavClick('landing')}
-            className="flex items-center gap-3 cursor-pointer group"
+            className="flex items-center gap-3 cursor-pointer group text-left shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-xl"
           >
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-600/20 group-hover:scale-105 transition-transform duration-200">
-              <Leaf className="w-6 h-6 stroke-[2.2]" />
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-600/20 group-hover:scale-105 transition-transform duration-200">
+              <Leaf className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.2]" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-bold text-xl tracking-tight text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                <span className="font-bold text-lg sm:text-xl tracking-tight text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                   Green Campaign
                 </span>
                 <span className="px-1.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 rounded border border-emerald-200/50 dark:border-emerald-800/40">
@@ -115,7 +119,7 @@ export default function Navbar({
                 Sustainability Education Visual Generator
               </p>
             </div>
-          </div>
+          </button>
 
           {/* Desktop Nav Items */}
           <nav className="hidden lg:flex items-center gap-1 bg-slate-100/80 dark:bg-slate-800/80 p-1.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60 transition-colors">
@@ -125,6 +129,7 @@ export default function Navbar({
               return (
                 <button
                   key={item.id}
+                  type="button"
                   onClick={() => handleNavClick(item.id)}
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer ${
                     isActive
@@ -145,29 +150,19 @@ export default function Navbar({
             })}
           </nav>
 
-          {/* Right utilities: Theme Toggle + Model Badge + Account Menu */}
-          <div className="flex items-center gap-2.5">
-            {/* Theme Toggle Button */}
-            <button
-              onClick={toggleTheme}
-              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="p-2.5 rounded-xl text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/80 transition-all cursor-pointer"
-            >
-              {theme === 'dark' ? (
-                <Sun className="w-4 h-4 text-amber-400 transition-transform rotate-0 hover:rotate-45" />
-              ) : (
-                <Moon className="w-4 h-4 text-slate-600 transition-transform rotate-0 hover:-rotate-12" />
-              )}
-            </button>
-
+          {/* Right utilities: Model Badge + Account Menu + Mobile Menu + Top-Right Theme Toggle */}
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
             {/* Provider status badge */}
             <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/40 rounded-full text-xs font-medium text-emerald-800 dark:text-emerald-300">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  modelReady ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                }`}
+              ></span>
               <Cpu className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span className="font-bold">{healthStatus.model || 'FLUX.2 Klein 4B Q4'}</span>
+              <span className="font-bold">FLUX.1 Dev Q4</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/60 font-semibold text-emerald-800 dark:text-emerald-300">
-                {healthStatus.model_status || 'Ready'}
+                {healthStatus.model_status || (modelReady ? 'Ready' : 'Offline')}
               </span>
             </div>
 
@@ -179,7 +174,7 @@ export default function Navbar({
                   onClick={() => setAccountMenuOpen((prev) => !prev)}
                   aria-expanded={accountMenuOpen}
                   aria-label="Open account menu"
-                  className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200/70 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer"
+                  className="flex items-center gap-2 pl-2 pr-2.5 sm:pr-3 py-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200/70 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer"
                 >
                   {user.avatar_url ? (
                     <img
@@ -199,7 +194,7 @@ export default function Navbar({
                 </button>
 
                 {accountMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl py-2 z-50 animate-in fade-in duration-150">
+                  <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl py-2 z-50 animate-in">
                     <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 space-y-1">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
@@ -270,11 +265,32 @@ export default function Navbar({
 
             {/* Mobile menu toggle */}
             <button
+              type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl lg:hidden cursor-pointer"
               aria-label="Toggle navigation menu"
             >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+
+            {/* Dark / Light Mode Toggle pinned to the TOP-RIGHT CORNER on both desktop & mobile */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="relative inline-flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 text-slate-700 dark:text-amber-300 hover:text-emerald-600 dark:hover:text-amber-200 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 shadow-xs transition-all duration-300 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 shrink-0"
+            >
+              <Sun
+                className={`w-[18px] h-[18px] text-amber-400 transition-all duration-300 absolute ${
+                  theme === 'dark' ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 -rotate-90 scale-50'
+                }`}
+              />
+              <Moon
+                className={`w-[18px] h-[18px] text-slate-700 transition-all duration-300 absolute ${
+                  theme === 'dark' ? 'opacity-0 rotate-90 scale-50' : 'opacity-100 rotate-0 scale-100'
+                }`}
+              />
             </button>
           </div>
         </div>
@@ -282,15 +298,16 @@ export default function Navbar({
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="lg:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 pt-3 pb-6 space-y-2">
+        <div className="lg:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 pt-3 pb-6 space-y-2 transition-colors">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activePage === item.id;
             return (
               <button
                 key={item.id}
+                type="button"
                 onClick={() => handleNavClick(item.id)}
-                className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${
                   isActive
                     ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800/40'
                     : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -315,15 +332,17 @@ export default function Navbar({
                 <p className="text-slate-500 dark:text-slate-400">{user.email}</p>
               </div>
               <button
+                type="button"
                 onClick={() => handleNavClick('profile')}
-                className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 <User className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                 <span>Profile &amp; Settings</span>
               </button>
               <button
+                type="button"
                 onClick={handleLogout}
-                className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
               >
                 <LogOut className="w-5 h-5" />
                 <span>Sign Out</span>
@@ -332,14 +351,16 @@ export default function Navbar({
           ) : (
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2">
               <button
+                type="button"
                 onClick={() => handleNavClick('login')}
-                className="py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200"
+                className="py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer"
               >
                 Sign In
               </button>
               <button
+                type="button"
                 onClick={() => handleNavClick('signup')}
-                className="py-2.5 px-4 rounded-xl bg-emerald-600 text-white text-xs font-bold"
+                className="py-2.5 px-4 rounded-xl bg-emerald-600 text-white text-xs font-bold cursor-pointer"
               >
                 Sign Up
               </button>
@@ -349,8 +370,8 @@ export default function Navbar({
           <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-2">
             <span>AI Diffusion Engine</span>
             <span className="flex items-center gap-1.5 font-medium text-emerald-700 dark:text-emerald-400">
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              {healthStatus.model || 'FLUX.2 Klein 4B Q4'}
+              <span className={`w-2 h-2 rounded-full ${modelReady ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+              {healthStatus.model || 'FLUX.1 Dev (Q4_K_S GGUF)'}
             </span>
           </div>
         </div>

@@ -30,18 +30,18 @@ export default function LandingPage({ setActivePage, onSelectExample }) {
   const features = [
     {
       icon: Sparkles,
-      title: "Context-Aware Prompt Synthesis",
-      desc: "Our automated prompt engine translates basic themes into nuanced educational prompts with negative category exclusions, lighting directives, and public utility aesthetics."
+      title: "Faithful FLUX.1 Dev Prompting",
+      desc: "Preserves your exact environmental message at the forefront while applying clean art direction, lighting, and campaign composition."
     },
     {
       icon: Layers,
       title: "6 Specialized Visual Styles",
-      desc: "From friendly 3D character illustrations for school programs to photorealistic solar installations for commercial utility bill inserts."
+      desc: "From friendly 3D character illustrations for school programs to photorealistic solar installations for commercial utility campaigns."
     },
     {
       icon: Clock,
-      title: "Instant Turnaround for Rapid Campaigns",
-      desc: "Generate production-ready campaign artwork in seconds rather than waiting weeks for agency graphic design turnaround."
+      title: "Fast & Quality Inference Presets",
+      desc: "Choose Fast Mode (512px, 18 steps) for rapid drafting or Quality Mode (768px, 26 steps) for detailed campaign posters."
     },
     {
       icon: Download,
@@ -101,7 +101,7 @@ export default function LandingPage({ setActivePage, onSelectExample }) {
           <div className="pt-6 flex flex-wrap items-center justify-center gap-y-2 gap-x-8 text-xs font-semibold text-slate-500 dark:text-slate-400">
             <span className="flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              Real Diffusion AI Generation
+              FLUX.1 Dev 12B Local AI
             </span>
             <span className="flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
@@ -109,7 +109,7 @@ export default function LandingPage({ setActivePage, onSelectExample }) {
             </span>
             <span className="flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              Category Negative Exclusions
+              Fast &amp; Quality Presets
             </span>
             <span className="flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />

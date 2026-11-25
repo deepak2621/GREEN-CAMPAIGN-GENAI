@@ -50,7 +50,7 @@ export async function checkHealth() {
       status: 'offline',
       provider_ready: false,
       provider_note: 'Backend service unreachable. Please ensure Flask is running.',
-      error: err.message
+      error: err.message,
     };
   }
 }
@@ -61,14 +61,14 @@ export async function fetchConfig() {
   return await res.json();
 }
 
-export async function fetchCooldown() {
-  try {
-    const res = await fetch(`${API_BASE}/cooldown`);
-    if (!res.ok) return { cooldown_remaining: 0, ready: true };
-    return await res.json();
-  } catch {
-    return { cooldown_remaining: 0, ready: true };
-  }
+export async function fetchSystemMetrics() {
+  const res = await fetch(`${API_BASE}/system-metrics`, {
+    headers: buildAuthHeaders(),
+  });
+  await handleProtectedResponse(res);
+  if (!res.ok) throw new Error('Failed to load hardware telemetry');
+  const data = await res.json();
+  return data.data;
 }
 
 export async function previewPrompt(payload) {
@@ -76,8 +76,9 @@ export async function previewPrompt(payload) {
     const res = await fetch(`${API_BASE}/preview-prompt`, {
       method: 'POST',
       headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
+    await handleProtectedResponse(res);
     if (!res.ok) return null;
     const data = await res.json();
     return data.data;
@@ -86,30 +87,74 @@ export async function previewPrompt(payload) {
   }
 }
 
+function buildApiError(data, statusCode, fallbackMsg) {
+  const error = new Error(data?.message || fallbackMsg);
+  error.errorType = data?.error_type || 'UnknownError';
+  error.validationErrors = data?.errors || null;
+  error.rateLimited = data?.rate_limited || false;
+  error.retryAfter = data?.retry_after || 0;
+  error.statusCode = statusCode;
+  return error;
+}
+
 export async function generateCampaignImage(payload) {
   const res = await fetch(`${API_BASE}/generate`, {
     method: 'POST',
     headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
 
   await handleProtectedResponse(res);
   const data = await res.json();
   if (!res.ok) {
-    const error = new Error(data.message || 'Failed to generate campaign image');
-    error.errorType = data.error_type || 'UnknownError';
-    error.validationErrors = data.errors || null;
-    error.rateLimited = data.rate_limited || false;
-    error.retryAfter = data.retry_after || 30;
-    error.statusCode = res.status;
-    throw error;
+    throw buildApiError(data, res.status, 'Failed to generate campaign image');
+  }
+  return data;
+}
+
+export async function startGenerationJob(payload) {
+  const res = await fetch(`${API_BASE}/generate/start`, {
+    method: 'POST',
+    headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  });
+
+  await handleProtectedResponse(res);
+  const data = await res.json();
+  if (!res.ok) {
+    throw buildApiError(data, res.status, 'Failed to start image generation');
+  }
+  return data.data;
+}
+
+export async function getGenerationStatus(jobId) {
+  const res = await fetch(`${API_BASE}/generate/status/${jobId}`, {
+    headers: buildAuthHeaders(),
+  });
+  await handleProtectedResponse(res);
+  const data = await res.json();
+  if (!res.ok) {
+    throw buildApiError(data, res.status, 'Failed to read generation progress');
+  }
+  return data.data;
+}
+
+export async function cancelGenerationJob(jobId) {
+  const res = await fetch(`${API_BASE}/generate/cancel/${jobId}`, {
+    method: 'POST',
+    headers: buildAuthHeaders(),
+  });
+  await handleProtectedResponse(res);
+  const data = await res.json();
+  if (!res.ok) {
+    throw buildApiError(data, res.status, 'Failed to cancel generation');
   }
   return data;
 }
 
 export async function fetchHistory() {
   const res = await fetch(`${API_BASE}/history`, {
-    headers: buildAuthHeaders()
+    headers: buildAuthHeaders(),
   });
   await handleProtectedResponse(res);
   if (!res.ok) throw new Error('Failed to fetch campaign history');
@@ -120,7 +165,7 @@ export async function saveCampaignToHistory(payload) {
   const res = await fetch(`${API_BASE}/history`, {
     method: 'POST',
     headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
   await handleProtectedResponse(res);
   const data = await res.json();
@@ -131,7 +176,7 @@ export async function saveCampaignToHistory(payload) {
 export async function deleteCampaignFromHistory(id) {
   const res = await fetch(`${API_BASE}/history/${id}`, {
     method: 'DELETE',
-    headers: buildAuthHeaders()
+    headers: buildAuthHeaders(),
   });
   await handleProtectedResponse(res);
   const data = await res.json();
@@ -147,7 +192,7 @@ export async function apiAuthRegister(payload) {
   const res = await fetch(`${API_BASE}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
   const data = await res.json();
   if (!res.ok) {
@@ -164,7 +209,7 @@ export async function apiAuthLogin(payload) {
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
   const data = await res.json();
   if (!res.ok) {
@@ -183,7 +228,7 @@ export async function apiAuthVerifyEmail(token) {
   const res = await fetch(`${API_BASE}/auth/verify-email`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token })
+    body: JSON.stringify({ token }),
   });
   const data = await res.json();
   if (!res.ok) {
@@ -196,7 +241,7 @@ export async function apiAuthResendVerification(email) {
   const res = await fetch(`${API_BASE}/auth/resend-verification`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email })
+    body: JSON.stringify({ email }),
   });
   const data = await res.json();
   if (!res.ok) {
@@ -209,7 +254,7 @@ export async function apiAuthForgotPassword(email) {
   const res = await fetch(`${API_BASE}/auth/forgot-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email })
+    body: JSON.stringify({ email }),
   });
   const data = await res.json();
   if (!res.ok) {
@@ -224,7 +269,7 @@ export async function apiAuthResetPassword(payload) {
   const res = await fetch(`${API_BASE}/auth/reset-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
   const data = await res.json();
   if (!res.ok) {
@@ -238,7 +283,7 @@ export async function apiAuthResetPassword(payload) {
 export async function apiAuthGetMe(tokenOverride) {
   const token = tokenOverride || getApiAuthToken();
   const res = await fetch(`${API_BASE}/auth/me`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {}
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) {
     throw new Error('Invalid or expired session');
@@ -250,7 +295,7 @@ export async function apiAuthUpdateProfile(payload) {
   const res = await fetch(`${API_BASE}/auth/profile`, {
     method: 'PUT',
     headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
   await handleProtectedResponse(res);
   const data = await res.json();

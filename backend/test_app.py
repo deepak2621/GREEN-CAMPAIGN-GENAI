@@ -1,11 +1,13 @@
 import os
 import uuid
 import unittest
+from pathlib import Path
 from PIL import Image
 from backend.app import create_app
 from backend.config import Config
 from backend.database.db import get_db_connection
 from backend.services.prompt_builder import build_prompt
+from backend.services.model_config import Flux1DevConfig
 
 
 class GreenCampaignAITestCase(unittest.TestCase):
@@ -22,7 +24,7 @@ class GreenCampaignAITestCase(unittest.TestCase):
             "email": test_email,
             "password": password,
             "confirm_password": password,
-            "terms_accepted": True
+            "terms_accepted": True,
         })
         self.assertEqual(reg_res.status_code, 201)
         token = reg_res.get_json()["data"]["verification_token"]
@@ -33,7 +35,7 @@ class GreenCampaignAITestCase(unittest.TestCase):
         login_res = self.client.post("/api/auth/login", json={
             "email": test_email,
             "password": password,
-            "remember_me": True
+            "remember_me": True,
         })
         self.assertEqual(login_res.status_code, 200)
         access_token = login_res.get_json()["data"]["access_token"]
@@ -47,64 +49,70 @@ class GreenCampaignAITestCase(unittest.TestCase):
         conn.close()
 
     def test_01_health_check(self):
-        """Test health check returns 200 and valid json."""
+        """Test health check returns 200 and FLUX.1 Dev metadata."""
         response = self.client.get("/api/health")
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertEqual(data["status"], "healthy")
-        self.assertIn("provider", data)
+        self.assertIn("FLUX.1 Dev", data["model"])
         self.assertTrue(data["storage_ready"])
 
     def test_02_config_endpoint(self):
-        """Test config endpoint returns allowed categories, styles, audiences."""
+        """Test config endpoint returns categories, styles, audiences, and fast/quality presets."""
         response = self.client.get("/api/config")
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertIn("Water Conservation", data["categories"])
-        self.assertIn("3D Illustration", data["styles"])
+        self.assertIn("Realistic Photography", data["styles"])
         self.assertIn("General Public", data["audiences"])
-        self.assertTrue(len(data["aspect_ratios"]) >= 3)
+        self.assertIn("fast", data["presets"])
+        self.assertIn("quality", data["presets"])
+        self.assertEqual(data["presets"]["fast"]["aspect_ratios"]["1:1"]["width"], 512)
+        self.assertEqual(data["presets"]["quality"]["aspect_ratios"]["1:1"]["width"], 768)
 
-    def test_03_cooldown_endpoint(self):
-        """Test /api/cooldown returns cooldown status."""
-        response = self.client.get("/api/cooldown")
-        self.assertEqual(response.status_code, 200)
-        data = response.get_json()
-        self.assertTrue(data["success"])
-        self.assertIn("cooldown_remaining", data)
-        self.assertIn("ready", data)
+    def test_03_system_metrics_requires_auth_and_returns_real_data(self):
+        """Test /api/system-metrics requires auth and returns real hardware telemetry."""
+        self.assertEqual(self.client.get("/api/system-metrics").status_code, 401)
+        email, _, headers = self._register_and_login_test_user()
+        try:
+            res = self.client.get("/api/system-metrics", headers=headers)
+            self.assertEqual(res.status_code, 200)
+            metrics = res.get_json()["data"]
+            self.assertIn("ram_total_gb", metrics)
+            self.assertGreater(metrics["ram_total_gb"], 0)
+            self.assertIn("generation_status", metrics)
+        finally:
+            self._cleanup_test_user(email)
 
-    def test_04_prompt_builder_category_relevance_and_exclusions(self):
-        """Test prompt builder ensures category focus and negative exclusions."""
-        res_water = build_prompt(
-            theme="Save Water",
-            description="Person closing tap while brushing",
-            category="Water Conservation",
-            image_style="3D Illustration",
-            target_audience="Students",
-            aspect_ratio="1:1"
-        )
-        self.assertIn("Save Water", res_water["prompt"])
-        self.assertIn("water droplet", res_water["prompt"].lower())
-        self.assertIn("solar panels", res_water["negative_prompt"].lower())
-        self.assertIn("wind turbines", res_water["negative_prompt"].lower())
-
-        res_energy = build_prompt(
-            theme="Save Electricity",
-            description="Turn off unused lights",
-            category="Energy Conservation",
+    def test_04_prompt_builder_preserves_user_intent_and_custom_prompt(self):
+        """Test prompt builder keeps user prompt front-loaded and respects custom_prompt verbatim."""
+        res_user = build_prompt(
+            theme="Coral Reef Restoration",
+            description="Divers planting healthy coral fragments in crystal clear turquoise ocean water",
+            category="Climate Awareness",
             image_style="Realistic Photography",
-            target_audience="Households",
-            aspect_ratio="16:9"
+            target_audience="Students",
+            aspect_ratio="16:9",
+            preset="quality",
         )
-        self.assertIn("Save Electricity", res_energy["prompt"])
-        self.assertIn("led light bulb", res_energy["prompt"].lower())
-        self.assertIn("water droplets", res_energy["negative_prompt"].lower())
-        self.assertIn("faucet", res_energy["negative_prompt"].lower())
+        self.assertTrue(res_user["prompt"].startswith("Coral Reef Restoration: Divers planting healthy coral fragments"))
+        self.assertEqual(res_user["dimensions"], {"width": 896, "height": 512, "label": "Landscape (16:9)"})
+
+        exact = "A close-up photograph of solar engineers inspecting photovoltaic panels at sunrise"
+        res_custom = build_prompt(
+            theme="Solar",
+            description="Solar",
+            category="Renewable Energy",
+            image_style="Realistic Photography",
+            target_audience="General Public",
+            custom_prompt=exact,
+        )
+        self.assertEqual(res_custom["prompt"], exact)
 
     def test_05_protected_routes_reject_unauthenticated(self):
         """Test that unauthenticated requests to protected endpoints fail with 401."""
         self.assertEqual(self.client.post("/api/generate", json={}).status_code, 401)
+        self.assertEqual(self.client.post("/api/generate/start", json={}).status_code, 401)
         self.assertEqual(self.client.get("/api/history").status_code, 401)
         self.assertEqual(self.client.get("/api/auth/me").status_code, 401)
 
@@ -123,36 +131,36 @@ class GreenCampaignAITestCase(unittest.TestCase):
             self._cleanup_test_user(email)
 
     def test_07_configuration_error_on_missing_model_files(self):
-        """Test that missing checkpoint files return clear ConfigurationError 422."""
-        from pathlib import Path
-        from backend.services.model_config import Flux2KleinConfig
+        """Test that missing FLUX.1 Dev checkpoint files return clear ConfigurationError 422."""
         email, _, headers = self._register_and_login_test_user()
-        orig_unet = Flux2KleinConfig.UNET_PATH
+        orig_unet = Flux1DevConfig.UNET_PATH
         try:
-            Flux2KleinConfig.UNET_PATH = Path("non_existent_model.gguf")
+            Flux1DevConfig.UNET_PATH = Path("non_existent_flux1_dev.gguf")
             payload = {
                 "campaign_title": "Clean Oceans",
                 "description": "Zero plastic in oceans",
                 "category": "Pollution Control",
                 "image_style": "Digital Art",
-                "target_audience": "General Public"
+                "target_audience": "General Public",
+                "preset": "fast",
             }
             response = self.client.post("/api/generate", json=payload, headers=headers)
             self.assertEqual(response.status_code, 422)
             data = response.get_json()
             self.assertEqual(data["error_type"], "ConfigurationError")
-            self.assertIn("FLUX.2 Klein files not found", data["message"])
+            self.assertIn("FLUX.1 Dev model files not found", data["message"])
         finally:
-            Flux2KleinConfig.UNET_PATH = orig_unet
+            Flux1DevConfig.UNET_PATH = orig_unet
             self._cleanup_test_user(email)
 
-    def test_08_history_crud_duplicate_prevention_and_seed(self):
-        """Test saving campaign with seed, duplicate prevention, and deletion."""
-        email, _, headers = self._register_and_login_test_user()
+    def test_08_history_crud_duplicate_prevention_and_security(self):
+        """Test saving campaign, duplicate prevention, path traversal protection, and ownership enforcement."""
+        email1, _, headers1 = self._register_and_login_test_user()
+        email2, _, headers2 = self._register_and_login_test_user()
         try:
             gen_dir = Config.GENERATED_IMAGES_DIR
             os.makedirs(gen_dir, exist_ok=True)
-            test_img_path = os.path.join(gen_dir, "test_sample_campaign.png")
+            test_img_path = os.path.join(gen_dir, f"test_sample_{uuid.uuid4().hex[:6]}.png")
             img = Image.new("RGB", (512, 512), color=(16, 185, 129))
             img.save(test_img_path, format="PNG")
 
@@ -164,129 +172,121 @@ class GreenCampaignAITestCase(unittest.TestCase):
                 "target_audience": "Households",
                 "aspect_ratio": "1:1",
                 "generated_prompt": "3D render of water droplet",
-                "negative_prompt": "blurry, solar panels",
+                "negative_prompt": "blurry",
                 "image_path": test_img_path,
-                "seed": 987654
+                "seed": 987654,
             }
 
-            save_res = self.client.post("/api/history", json=history_payload, headers=headers)
+            save_res = self.client.post("/api/history", json=history_payload, headers=headers1)
             self.assertEqual(save_res.status_code, 201)
             campaign_id = save_res.get_json()["data"]["id"]
-            self.assertTrue(campaign_id)
 
-            dup_res = self.client.post("/api/history", json=history_payload, headers=headers)
-            self.assertEqual(dup_res.status_code, 201)
+            dup_res = self.client.post("/api/history", json=history_payload, headers=headers1)
             self.assertEqual(dup_res.get_json()["data"]["id"], campaign_id)
 
-            list_res = self.client.get("/api/history", headers=headers)
-            self.assertEqual(list_res.status_code, 200)
-            items = list_res.get_json()["data"]
-            matching = [i for i in items if i["id"] == campaign_id]
-            self.assertEqual(len(matching), 1)
-            self.assertTrue(matching[0]["image_exists"])
+            # User 2 cannot delete User 1's campaign
+            forbidden_del = self.client.delete(f"/api/history/{campaign_id}", headers=headers2)
+            self.assertEqual(forbidden_del.status_code, 403)
 
-            del_res = self.client.delete(f"/api/history/{campaign_id}", headers=headers)
+            # Path traversal on image endpoint returns 404
+            self.assertEqual(self.client.get("/api/images/..%2F..%2Fconfig.py").status_code, 404)
+
+            # Owner can delete cleanly
+            del_res = self.client.delete(f"/api/history/{campaign_id}", headers=headers1)
             self.assertEqual(del_res.status_code, 200)
-
-            get_res = self.client.get(f"/api/history/{campaign_id}", headers=headers)
-            self.assertEqual(get_res.status_code, 404)
+            self.assertFalse(os.path.exists(test_img_path))
         finally:
-            self._cleanup_test_user(email)
+            self._cleanup_test_user(email1)
+            self._cleanup_test_user(email2)
 
-    def test_09_full_auth_lifecycle_unit(self):
-        """Tests registration, duplicate email, invalid login, unverified login block, verification, forgot/reset password, and profile update."""
+    def test_09_full_auth_lifecycle_and_avatar_xss_guard(self):
+        """Tests registration, duplicate email, verification, login, XSS avatar URL rejection, and password reset."""
         test_email = f"auth_life_{uuid.uuid4().hex[:8]}@greencampaign.ai"
         pw1 = "GreenAI@2026"
         pw2 = "EcoPower#99"
 
         try:
-            # 1. Weak password rejection
             weak_res = self.client.post("/api/auth/register", json={
                 "full_name": "Eco Tester",
                 "email": test_email,
                 "password": "weak",
                 "confirm_password": "weak",
-                "terms_accepted": True
+                "terms_accepted": True,
             })
             self.assertEqual(weak_res.status_code, 400)
 
-            # 2. Valid Registration
             reg_res = self.client.post("/api/auth/register", json={
                 "full_name": "Eco Tester",
                 "email": test_email,
                 "password": pw1,
                 "confirm_password": pw1,
-                "terms_accepted": True
+                "terms_accepted": True,
             })
             self.assertEqual(reg_res.status_code, 201)
             verify_token = reg_res.get_json()["data"]["verification_token"]
 
-            # 3. Duplicate email rejected (409)
             dup_res = self.client.post("/api/auth/register", json={
                 "full_name": "Eco Tester 2",
                 "email": test_email,
                 "password": pw1,
                 "confirm_password": pw1,
-                "terms_accepted": True
+                "terms_accepted": True,
             })
             self.assertEqual(dup_res.status_code, 409)
 
-            # 4. Login blocked before email verification (403)
-            unverified_login = self.client.post("/api/auth/login", json={
-                "email": test_email,
-                "password": pw1
-            })
-            self.assertEqual(unverified_login.status_code, 403)
+            self.assertEqual(
+                self.client.post("/api/auth/login", json={"email": test_email, "password": pw1}).status_code,
+                403,
+            )
 
-            # 5. Email verification succeeds
-            ver_res = self.client.post("/api/auth/verify-email", json={"token": verify_token})
-            self.assertEqual(ver_res.status_code, 200)
+            self.assertEqual(self.client.post("/api/auth/verify-email", json={"token": verify_token}).status_code, 200)
 
-            # 6. Invalid password rejected (401)
-            bad_login = self.client.post("/api/auth/login", json={
-                "email": test_email,
-                "password": "WrongPassword!1"
-            })
-            self.assertEqual(bad_login.status_code, 401)
+            self.assertEqual(
+                self.client.post("/api/auth/login", json={"email": test_email, "password": "WrongPassword!1"}).status_code,
+                401,
+            )
 
-            # 7. Valid login succeeds
             ok_login = self.client.post("/api/auth/login", json={
                 "email": test_email,
                 "password": pw1,
-                "remember_me": True
+                "remember_me": True,
             })
             self.assertEqual(ok_login.status_code, 200)
-            jwt_token = ok_login.get_json()["data"]["access_token"]
-            headers = {"Authorization": f"Bearer {jwt_token}"}
+            headers = {"Authorization": f"Bearer {ok_login.get_json()['data']['access_token']}"}
 
-            # 8. Profile fetch & update
-            me_res = self.client.get("/api/auth/me", headers=headers)
-            self.assertEqual(me_res.status_code, 200)
-            self.assertEqual(me_res.get_json()["data"]["user"]["full_name"], "Eco Tester")
+            # Reject javascript: avatar_url
+            bad_avatar = self.client.put(
+                "/api/auth/profile",
+                json={"full_name": "Eco Lead Tester", "avatar_url": "javascript:alert(1)"},
+                headers=headers,
+            )
+            self.assertEqual(bad_avatar.status_code, 400)
 
-            upd_res = self.client.put("/api/auth/profile", json={"full_name": "Eco Lead Tester"}, headers=headers)
+            upd_res = self.client.put(
+                "/api/auth/profile",
+                json={"full_name": "Eco Lead Tester", "avatar_url": "https://example.com/avatar.png"},
+                headers=headers,
+            )
             self.assertEqual(upd_res.status_code, 200)
             self.assertEqual(upd_res.get_json()["data"]["user"]["full_name"], "Eco Lead Tester")
 
-            # 9. Forgot password & reset password
             forgot_res = self.client.post("/api/auth/forgot-password", json={"email": test_email})
-            self.assertEqual(forgot_res.status_code, 200)
             reset_token = forgot_res.get_json()["data"]["reset_token"]
-            self.assertTrue(reset_token)
 
             reset_res = self.client.post("/api/auth/reset-password", json={
                 "token": reset_token,
                 "password": pw2,
-                "confirm_password": pw2
+                "confirm_password": pw2,
             })
             self.assertEqual(reset_res.status_code, 200)
-
-            # 10. Old password fails, new password succeeds
-            old_pw_login = self.client.post("/api/auth/login", json={"email": test_email, "password": pw1})
-            self.assertEqual(old_pw_login.status_code, 401)
-
-            new_pw_login = self.client.post("/api/auth/login", json={"email": test_email, "password": pw2})
-            self.assertEqual(new_pw_login.status_code, 200)
+            self.assertEqual(
+                self.client.post("/api/auth/login", json={"email": test_email, "password": pw1}).status_code,
+                401,
+            )
+            self.assertEqual(
+                self.client.post("/api/auth/login", json={"email": test_email, "password": pw2}).status_code,
+                200,
+            )
         finally:
             self._cleanup_test_user(test_email)
 

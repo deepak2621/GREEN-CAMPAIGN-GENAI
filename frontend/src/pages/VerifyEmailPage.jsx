@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle2, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/authContextValue';
 
 export default function VerifyEmailPage({ navigateTo, showToast }) {
   const { verifyEmail, isSupabaseConfigured } = useAuth();

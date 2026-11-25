@@ -1,3 +1,5 @@
+import logging
+from urllib.parse import urlparse
 from datetime import datetime, timedelta, timezone
 from flask import Blueprint, request, jsonify, g
 from backend.config import Config
@@ -5,6 +7,19 @@ from backend.database.models import UserModel
 from backend.services.auth_service import AuthService, require_auth
 
 auth_bp = Blueprint("auth", __name__)
+logger = logging.getLogger("green_campaign_ai")
+
+
+def _validate_avatar_url(raw_url: str):
+    cleaned = (raw_url or "").strip()
+    if not cleaned:
+        return True, ""
+    if len(cleaned) > 500:
+        return False, "Avatar URL must be 500 characters or fewer."
+    parsed = urlparse(cleaned)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return False, "Avatar URL must be a valid http:// or https:// URL."
+    return True, cleaned
 
 
 @auth_bp.route("/auth/register", methods=["POST"])
@@ -23,6 +38,8 @@ def register():
     errors = {}
     if not full_name or len(full_name) < 2:
         errors["full_name"] = "Full name must be at least 2 characters."
+    elif len(full_name) > 120:
+        errors["full_name"] = "Full name must be 120 characters or fewer."
 
     email_ok, email_err = AuthService.validate_email(email)
     if not email_ok:
@@ -46,7 +63,6 @@ def register():
             "errors": errors,
         }), 400
 
-    # Check duplicate email
     existing = UserModel.find_by_email(email)
     if existing:
         return jsonify({
@@ -83,8 +99,7 @@ def register():
         "requires_verification": True,
         "email_sent": email_sent,
     }
-    # Provide safe local verification link when SMTP is not configured
-    if not email_sent:
+    if not email_sent and Config.ALLOW_DEV_AUTH_LINKS:
         response_data["dev_verification_url"] = f"/verify-email?token={verification_token}"
         response_data["verification_token"] = verification_token
 
@@ -214,7 +229,7 @@ def resend_verification():
     )
 
     resp_data = {"email_sent": email_sent}
-    if not email_sent:
+    if not email_sent and Config.ALLOW_DEV_AUTH_LINKS:
         resp_data["dev_verification_url"] = f"/verify-email?token={token}"
         resp_data["verification_token"] = token
 
@@ -256,7 +271,7 @@ def forgot_password():
             text_body=f"Reset your Green Campaign AI password: {reset_url}",
         )
         resp_data["email_sent"] = email_sent
-        if not email_sent:
+        if not email_sent and Config.ALLOW_DEV_AUTH_LINKS:
             resp_data["dev_reset_url"] = f"/reset-password?token={reset_token}"
             resp_data["reset_token"] = reset_token
 
@@ -326,17 +341,29 @@ def update_user_profile():
     """Updates the authenticated user's profile (full_name, avatar_url)."""
     data = request.get_json(silent=True) or {}
     full_name = (data.get("full_name") or "").strip()
-    avatar_url = data.get("avatar_url")
+    raw_avatar_url = data.get("avatar_url")
 
-    if not full_name or len(full_name) < 2:
+    if not full_name or len(full_name) < 2 or len(full_name) > 120:
         return jsonify({
             "success": False,
             "error_type": "ValidationError",
-            "message": "Full name must be at least 2 characters.",
-            "errors": {"full_name": "Full name must be at least 2 characters."},
+            "message": "Full name must be between 2 and 120 characters.",
+            "errors": {"full_name": "Full name must be between 2 and 120 characters."},
         }), 400
 
-    updated = UserModel.update_profile(g.current_user_id, full_name, avatar_url)
+    clean_avatar = None
+    if raw_avatar_url is not None:
+        ok, avatar_res = _validate_avatar_url(str(raw_avatar_url))
+        if not ok:
+            return jsonify({
+                "success": False,
+                "error_type": "ValidationError",
+                "message": avatar_res,
+                "errors": {"avatar_url": avatar_res},
+            }), 400
+        clean_avatar = avatar_res
+
+    updated = UserModel.update_profile(g.current_user_id, full_name, clean_avatar)
     return jsonify({
         "success": True,
         "message": "Profile updated successfully.",

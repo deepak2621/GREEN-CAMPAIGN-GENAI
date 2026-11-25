@@ -11,7 +11,7 @@ import {
   Key,
   ArrowLeft,
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/authContextValue';
 
 export default function ProfilePage({ navigateTo, showToast }) {
   const { user, updateProfile, signOut, authMode } = useAuth();

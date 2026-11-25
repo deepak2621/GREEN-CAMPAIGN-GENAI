@@ -6,13 +6,14 @@ from backend.database.db import init_db
 from backend.routes.generation import generation_bp
 from backend.routes.history import history_bp
 from backend.routes.auth import auth_bp
-from backend.services.model_config import Flux2KleinConfig
+from backend.services.model_config import Flux1DevConfig, GENERATION_PRESETS
+
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # Enable Cross-Origin Resource Sharing including Authorization header
+    # Cross-Origin Resource Sharing with Authorization header support
     CORS(
         app,
         resources={r"/api/*": {"origins": Config.CORS_ORIGINS}},
@@ -30,36 +31,38 @@ def create_app():
 
     @app.route("/api/health", methods=["GET"])
     def health_check():
-        """Health check endpoint confirming API availability and FLUX.2 Klein 4B Q4 model configuration."""
-        checkpoint_ready = Flux2KleinConfig.is_checkpoint_available()
+        """Health check endpoint confirming API availability and FLUX.1 Dev Q4 GGUF configuration."""
+        checkpoint_ready = Flux1DevConfig.is_checkpoint_available()
         status_text = "Ready" if checkpoint_ready else "Model Not Available"
 
         return jsonify({
             "status": "healthy",
             "app_name": "Green Campaign AI",
-            "version": "1.0.0",
-            "provider": Flux2KleinConfig.PROVIDER,
+            "version": "2.0.0",
+            "provider": Flux1DevConfig.PROVIDER,
             "provider_ready": checkpoint_ready,
-            "provider_note": "Active generation model: FLUX.2 Klein 4B Q4 (Distilled GGUF)",
-            "model": Flux2KleinConfig.MODEL_NAME,
+            "provider_note": "Active generation model: FLUX.1 Dev (12B Q4_K_S GGUF)",
+            "model": Flux1DevConfig.MODEL_NAME,
+            "developer": Flux1DevConfig.DEVELOPER,
+            "architecture": Flux1DevConfig.ARCHITECTURE,
             "model_status": status_text,
-            "quantization": Flux2KleinConfig.QUANTIZATION,
-            "unet": Flux2KleinConfig.UNET_NAME,
-            "clip": Flux2KleinConfig.CLIP_NAME,
-            "vae": Flux2KleinConfig.VAE_NAME,
-            "resolution": f"{Flux2KleinConfig.DEFAULT_WIDTH}x{Flux2KleinConfig.DEFAULT_HEIGHT}",
-            "inference_steps": Flux2KleinConfig.INFERENCE_STEPS,
-            "cfg_scale": Flux2KleinConfig.CFG_SCALE,
-            "execution": Flux2KleinConfig.EXECUTION_PROFILE,
-            "license": Flux2KleinConfig.LICENSE,
-            "speed_target": Flux2KleinConfig.SPEED_TARGET,
+            "quantization": Flux1DevConfig.QUANTIZATION,
+            "unet": Flux1DevConfig.UNET_NAME,
+            "clip": f"{Flux1DevConfig.CLIP_L_NAME} + {Flux1DevConfig.T5_XXL_NAME}",
+            "vae": Flux1DevConfig.VAE_NAME,
+            "resolution": f"{Flux1DevConfig.DEFAULT_WIDTH}x{Flux1DevConfig.DEFAULT_HEIGHT}",
+            "inference_steps": Flux1DevConfig.INFERENCE_STEPS,
+            "guidance_scale": Flux1DevConfig.GUIDANCE_SCALE,
+            "cfg_scale": Flux1DevConfig.CFG_SCALE,
+            "execution": Flux1DevConfig.EXECUTION_PROFILE,
+            "license": Flux1DevConfig.LICENSE,
             "database": "sqlite",
-            "storage_ready": os.path.isdir(Config.GENERATED_IMAGES_DIR)
+            "storage_ready": os.path.isdir(Config.GENERATED_IMAGES_DIR),
         }), 200
 
     @app.route("/api/config", methods=["GET"])
     def get_app_config():
-        """Returns campaign generation metadata options."""
+        """Returns campaign generation metadata options and FLUX.1 Dev presets."""
         return jsonify({
             "categories": [
                 "Water Conservation",
@@ -68,7 +71,7 @@ def create_app():
                 "Climate Awareness",
                 "Waste Management",
                 "Pollution Control",
-                "Sustainable Living"
+                "Sustainable Living",
             ],
             "styles": [
                 "Realistic Photography",
@@ -76,21 +79,23 @@ def create_app():
                 "Digital Art",
                 "Flat Vector Illustration",
                 "Educational Infographic Illustration",
-                "Cartoon Illustration"
+                "Cartoon Illustration",
             ],
             "audiences": [
                 "General Public",
                 "Students",
                 "Children",
                 "Households",
-                "Industrial Consumers"
+                "Industrial Consumers",
             ],
             "aspect_ratios": [
                 {"ratio": "1:1", "label": "Square (1:1)", "width": 512, "height": 512},
                 {"ratio": "4:5", "label": "Portrait (4:5)", "width": 512, "height": 640},
-                {"ratio": "16:9", "label": "Landscape (16:9)", "width": 640, "height": 384}
+                {"ratio": "16:9", "label": "Landscape (16:9)", "width": 640, "height": 384},
             ],
-            "current_provider": Flux2KleinConfig.PROVIDER
+            "presets": GENERATION_PRESETS,
+            "current_provider": Flux1DevConfig.PROVIDER,
+            "model": Flux1DevConfig.MODEL_NAME,
         }), 200
 
     @app.errorhandler(404)
@@ -103,8 +108,10 @@ def create_app():
 
     return app
 
+
 if __name__ == "__main__":
     app = create_app()
     port = int(os.environ.get("PORT", 5000))
     print(f"Starting Green Campaign AI Backend on http://127.0.0.1:{port}")
-    app.run(host="0.0.0.0", port=port, debug=True)
+    # Disable Werkzeug reloader so only one backend process owns the job manager & ComfyUI lock
+    app.run(host="127.0.0.1", port=port, debug=Config.FLASK_DEBUG, use_reloader=False)

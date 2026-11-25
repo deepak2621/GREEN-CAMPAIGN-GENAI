@@ -5,7 +5,7 @@ const CURRENT_YEAR = new Date().getFullYear();
 
 export default function Footer({ setActivePage }) {
   return (
-    <footer className="bg-slate-900 text-slate-300 border-t border-slate-800">
+    <footer className="bg-slate-900 dark:bg-slate-950 text-slate-300 border-t border-slate-800 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 lg:gap-12">
           
@@ -22,18 +22,18 @@ export default function Footer({ setActivePage }) {
             
             <p className="text-slate-400 text-sm max-w-md leading-relaxed">
               Empowering municipal utility companies, environmental organizations, and clean energy leaders 
-              to transform complex sustainability concepts into captivating, high-impact educational campaign visuals 
-              with cutting-edge diffusion AI.
+              to transform sustainability concepts into compelling, high-impact educational campaign visuals 
+              powered locally by Black Forest Labs FLUX.1 Dev.
             </p>
 
-            <div className="flex items-center gap-6 pt-2 text-xs text-slate-400">
+            <div className="flex flex-wrap items-center gap-6 pt-2 text-xs text-slate-400">
               <div className="flex items-center gap-1.5">
                 <Globe className="w-4 h-4 text-emerald-400" />
-                <span>Zero Carbon Footprint Workflows</span>
+                <span>Local Offline Inference</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Shield className="w-4 h-4 text-emerald-400" />
-                <span>Enterprise Grade</span>
+                <span>FLUX.1 Dev 12B Q4 GGUF</span>
               </div>
             </div>
           </div>
@@ -46,6 +46,7 @@ export default function Footer({ setActivePage }) {
             <ul className="space-y-2.5 text-sm">
               <li>
                 <button 
+                  type="button"
                   onClick={() => { setActivePage('dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                   className="text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer"
                 >
@@ -54,6 +55,7 @@ export default function Footer({ setActivePage }) {
               </li>
               <li>
                 <button 
+                  type="button"
                   onClick={() => { setActivePage('generator'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                   className="text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer"
                 >
@@ -62,6 +64,7 @@ export default function Footer({ setActivePage }) {
               </li>
               <li>
                 <button 
+                  type="button"
                   onClick={() => { setActivePage('explore'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                   className="text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer"
                 >
@@ -70,6 +73,7 @@ export default function Footer({ setActivePage }) {
               </li>
               <li>
                 <button 
+                  type="button"
                   onClick={() => { setActivePage('history'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                   className="text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer"
                 >
@@ -78,6 +82,7 @@ export default function Footer({ setActivePage }) {
               </li>
               <li>
                 <button 
+                  type="button"
                   onClick={() => { setActivePage('landing'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                   className="text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer"
                 >
@@ -93,11 +98,11 @@ export default function Footer({ setActivePage }) {
               Utility Focus Areas
             </h4>
             <ul className="space-y-2 text-sm text-slate-400">
-              <li>Water Conservation & Drought Awareness</li>
+              <li>Water Conservation &amp; Drought Awareness</li>
               <li>Residential Energy Efficiency</li>
-              <li>Rooftop Solar & Smart Grid Adoption</li>
-              <li>Plastic-Free Oceans & Circular Economy</li>
-              <li>Tree Canopy & Climate Resilience</li>
+              <li>Rooftop Solar &amp; Smart Grid Adoption</li>
+              <li>Plastic-Free Oceans &amp; Circular Economy</li>
+              <li>Tree Canopy &amp; Climate Resilience</li>
             </ul>
           </div>
         </div>
@@ -107,7 +112,7 @@ export default function Footer({ setActivePage }) {
             © {CURRENT_YEAR} Green Campaign AI. Built for Public Utilities and Environmental Educators.
           </p>
           <div className="flex items-center gap-1 text-slate-400">
-            <span>Powered by Diffusion Text-to-Image AI & Pillow</span>
+            <span>Powered by FLUX.1 Dev (ComfyUI) &amp; Pillow</span>
           </div>
         </div>
       </div>

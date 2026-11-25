@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { fetchHistory, deleteCampaignFromHistory } from '../services/api';
 import ConfirmationModal from '../components/ConfirmationModal';
+import { downloadImageFile } from '../utils/download';
 
 export default function HistoryPage({ setActivePage, onSelectForRegenerate, showToast }) {
   const [historyItems, setHistoryItems] = useState([]);
@@ -82,13 +83,7 @@ export default function HistoryPage({ setActivePage, onSelectForRegenerate, show
 
   const handleDownload = (item) => {
     const downloadUrl = item.download_url || `/api/images/${item.filename}/download`;
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = item.filename || 'sustainability_campaign.png';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast("Downloading visual PNG...", "info");
+    downloadImageFile(downloadUrl, item.filename || 'sustainability_campaign.png', showToast);
   };
 
   // Filtered campaigns

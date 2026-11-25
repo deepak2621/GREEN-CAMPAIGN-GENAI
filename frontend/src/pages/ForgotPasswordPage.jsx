@@ -9,7 +9,7 @@ import {
   KeyRound,
   ExternalLink,
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/authContextValue';
 import { validateEmail } from '../utils/authValidation';
 
 export default function ForgotPasswordPage({ navigateTo, showToast }) {

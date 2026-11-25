@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { AuthContext } from './authContextValue';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import {
   setApiAuthToken,
@@ -11,8 +12,6 @@ import {
   apiAuthGetMe,
   apiAuthUpdateProfile,
 } from '../services/api';
-
-const AuthContext = createContext(null);
 
 const TOKEN_STORAGE_KEY = 'gc_access_token';
 
@@ -377,10 +376,3 @@ export function AuthProvider({ children, onAuthEvent }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error('useAuth must be used inside AuthProvider');
-  }
-  return ctx;
-}

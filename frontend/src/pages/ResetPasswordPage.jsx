@@ -3,15 +3,15 @@ import {
   Lock,
   Eye,
   EyeOff,
-  Check,
   CheckCircle2,
   AlertCircle,
   Loader2,
   ShieldCheck,
   ArrowRight,
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/authContextValue';
 import { validatePassword, getPasswordRules } from '../utils/authValidation';
+import { PasswordChecklist } from '../components/AuthShared';
 
 export default function ResetPasswordPage({ navigateTo, showToast }) {
   const { resetPassword, isSupabaseConfigured } = useAuth();
@@ -154,19 +154,7 @@ export default function ResetPasswordPage({ navigateTo, showToast }) {
               <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{fieldErrors.password}</p>
             )}
 
-            <div className="grid grid-cols-1 gap-1 pt-1">
-              {passwordRules.map((rule) => (
-                <div
-                  key={rule.id}
-                  className={`flex items-center gap-1.5 text-[11px] font-medium ${
-                    rule.met ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'
-                  }`}
-                >
-                  <Check className={`w-3.5 h-3.5 shrink-0 ${rule.met ? 'opacity-100' : 'opacity-40'}`} />
-                  <span>{rule.label}</span>
-                </div>
-              ))}
-            </div>
+            <PasswordChecklist rules={passwordRules} columns={1} />
           </div>
 
           {/* Confirm New Password */}
