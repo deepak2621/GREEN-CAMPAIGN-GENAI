@@ -20,7 +20,7 @@ export default function Footer({ setActivePage }) {
 
             <p className="text-slate-400 text-sm max-w-md leading-relaxed">
               Environmental generative studio built for sustainability educators, conservation agencies,
-              and clean energy leaders—powered locally by FLUX.1 Dev.
+              and clean energy leaders—powered locally by FLUX.2 Klein 4B.
             </p>
 
             <div className="flex flex-wrap items-center gap-5 pt-2 text-xs text-slate-400">
@@ -30,7 +30,7 @@ export default function Footer({ setActivePage }) {
               </div>
               <div className="flex items-center gap-1.5">
                 <Shield className="w-3.5 h-3.5 text-emerald-400" />
-                <span>FLUX.1 Dev 12B Q4 GGUF</span>
+                <span>FLUX.2 Klein 4B Q4_K_M</span>
               </div>
             </div>
           </div>
@@ -79,7 +79,7 @@ export default function Footer({ setActivePage }) {
 
         <div className="mt-12 pt-8 border-t border-white/[0.07] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <p>© {CURRENT_YEAR} Green Campaign AI. Built for Environmental Educators &amp; Public Utilities.</p>
-          <span className="font-mono text-slate-400">ComfyUI • FLUX.1 Dev • Pillow PNG</span>
+          <span className="font-mono text-slate-400">ComfyUI • FLUX.2 Klein 4B • Pillow PNG</span>
         </div>
       </div>
     </footer>

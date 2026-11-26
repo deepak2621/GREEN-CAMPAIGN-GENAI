@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Download,
   RotateCcw,
@@ -17,7 +17,11 @@ import {
   Clock,
   Cpu,
 } from 'lucide-react';
-import { saveCampaignToHistory, generateCampaignImage } from '../services/api';
+import {
+  saveCampaignToHistory,
+  startGenerationJob,
+  getGenerationStatus,
+} from '../services/api';
 import { downloadImageFile } from '../utils/download';
 import { SpotlightCard, MagneticButton, StudioImage } from '../components/MotionPrimitives';
 
@@ -31,6 +35,16 @@ export default function ResultPage({
   const [isSaving, setIsSaving] = useState(false);
   const [showPromptDetails, setShowPromptDetails] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const regenTimerRef = useRef(null);
+  const regenMountedRef = useRef(true);
+
+  useEffect(() => {
+    regenMountedRef.current = true;
+    return () => {
+      regenMountedRef.current = false;
+      if (regenTimerRef.current) clearInterval(regenTimerRef.current);
+    };
+  }, []);
 
   if (!generatedData) {
     return (
@@ -91,9 +105,23 @@ export default function ResultPage({
   const handleRegenerateClick = async () => {
     if (isRegenerating) return;
     setIsRegenerating(true);
+    let inFlight = false;
+    let transientRetries = 0;
+    const startedAt = Date.now();
+
+    const finish = () => {
+      if (regenTimerRef.current) {
+        clearInterval(regenTimerRef.current);
+        regenTimerRef.current = null;
+      }
+      if (regenMountedRef.current) {
+        setIsRegenerating(false);
+      }
+    };
+
     try {
-      showToast('Generating a new FLUX.1 Dev variation...', 'info');
-      const res = await generateCampaignImage({
+      showToast('Generating a new FLUX.2 Klein 4B variation...', 'info');
+      const job = await startGenerationJob({
         campaign_title: generatedData.campaign_title,
         description: generatedData.description,
         category: generatedData.category,
@@ -104,13 +132,53 @@ export default function ResultPage({
         additional_instructions: generatedData.additional_instructions || '',
         seed: generatedData.seed ? Number(generatedData.seed) + 1 : undefined,
       });
-      setGeneratedData(res.data);
-      setIsSaved(false);
-      showToast('New FLUX.1 Dev variation ready!', 'success');
+
+      regenTimerRef.current = setInterval(async () => {
+        if (inFlight) return;
+        if (Date.now() - startedAt > 320000) {
+          finish();
+          showToast('Image generation took too long. Please try again.', 'error');
+          return;
+        }
+        inFlight = true;
+        try {
+          const status = await getGenerationStatus(job.job_id);
+          transientRetries = 0;
+          if (!regenMountedRef.current) {
+            finish();
+            return;
+          }
+          if (status.status === 'completed' && status.result?.image_url) {
+            finish();
+            setGeneratedData(status.result);
+            setIsSaved(false);
+            showToast('Your image has been generated successfully.', 'success');
+          } else if (status.status === 'error') {
+            finish();
+            showToast(status.error || 'Variation generation failed.', 'error');
+          } else if (status.status === 'cancelled') {
+            finish();
+            showToast('Variation generation cancelled.', 'info');
+          }
+        } catch (pollErr) {
+          const isTransient =
+            pollErr?.statusCode === 502 ||
+            pollErr?.statusCode === 503 ||
+            pollErr?.errorCode === 'BACKEND_UNAVAILABLE' ||
+            pollErr?.errorCode === 'EMPTY_RESPONSE';
+          if (isTransient && transientRetries < 3) {
+            transientRetries += 1;
+            return;
+          }
+          finish();
+          showToast(pollErr.message || 'Image-generation service is currently unavailable.', 'error');
+        } finally {
+          inFlight = false;
+        }
+      }, 750);
     } catch (err) {
-      showToast(err.message || 'Regeneration failed.', 'error');
-    } finally {
-      setIsRegenerating(false);
+      finish();
+      showToast(err.message || 'Variation generation failed.', 'error');
     }
   };
 
@@ -124,7 +192,7 @@ export default function ResultPage({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-900/10 dark:border-white/[0.08]">
         <div>
           <span className="text-[11px] font-mono font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-            FLUX.1 Dev Render
+            FLUX.2 Klein 4B Render
           </span>
           <h1 className="font-display text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
             {generatedData.campaign_title}
@@ -186,10 +254,11 @@ export default function ResultPage({
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Studio Image Darkroom Viewport */}
+        {/* Studio Image Viewport */}
         <SpotlightCard className="lg:col-span-7 p-4 sm:p-5 space-y-4">
-          <div className="relative group rounded-2xl overflow-hidden bg-[#060908] border border-white/10 flex items-center justify-center min-h-[380px] max-h-[640px]">
+          <div className="relative group rounded-2xl overflow-hidden bg-slate-100 dark:bg-[#080d0b] border border-slate-200 dark:border-white/10 flex items-center justify-center min-h-[380px] max-h-[640px] transition-colors">
             <StudioImage
+              key={generatedData.filename || generatedData.image_url}
               src={generatedData.image_url}
               alt={generatedData.campaign_title}
               loading="eager"
@@ -257,7 +326,7 @@ export default function ResultPage({
                   <Cpu className="w-3.5 h-3.5 text-emerald-500" /> Engine
                 </span>
                 <span className="font-mono text-slate-900 dark:text-white text-xs text-right">
-                  {generatedData.model || 'FLUX.1 Dev (Q4_K_S)'}
+                  {generatedData.model || 'FLUX.2 Klein 4B Q4'}
                   {generatedData.preset_label ? ` • ${generatedData.preset_label}` : ''}
                 </span>
               </div>
@@ -313,7 +382,7 @@ export default function ResultPage({
             >
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider font-mono text-slate-900 dark:text-white">
                 <FileCheck className="w-4 h-4 text-emerald-500" />
-                <span>FLUX.1 Dev Prompt &amp; Specs</span>
+                <span>FLUX.2 Klein 4B Prompt &amp; Specs</span>
               </div>
               {showPromptDetails ? (
                 <ChevronUp className="w-4 h-4 text-slate-400" />
@@ -330,7 +399,7 @@ export default function ResultPage({
 
                 {generatedData.steps && (
                   <div className="text-[11px] font-mono text-slate-600 dark:text-slate-400 bg-slate-900/[0.03] dark:bg-white/[0.03] p-2.5 rounded-xl">
-                    Steps: {generatedData.steps} • FluxGuidance: {generatedData.guidance_scale} •{' '}
+                    Steps: {generatedData.steps} • CFG: {generatedData.cfg_scale ?? generatedData.guidance_scale} •{' '}
                     {generatedData.sampler}/{generatedData.scheduler}
                   </div>
                 )}

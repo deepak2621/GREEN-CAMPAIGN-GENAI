@@ -1,5 +1,5 @@
 """
-Full stack verification test for Green Campaign AI (FLUX.1 Dev Q4 GGUF).
+Full stack verification test for Green Campaign AI (FLUX.2 Klein 4B Q4_K_M GGUF).
 Validates frontend dev server, Vite proxy routing, backend REST API, and model status.
 """
 

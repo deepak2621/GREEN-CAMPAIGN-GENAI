@@ -3,6 +3,7 @@ import {
   Lock,
   Eye,
   EyeOff,
+  Check,
   CheckCircle2,
   AlertCircle,
   Loader2,
@@ -11,12 +12,11 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/authContextValue';
 import { validatePassword, getPasswordRules } from '../utils/authValidation';
-import { PasswordChecklist } from '../components/AuthShared';
-import { MagneticButton } from '../components/MotionPrimitives';
 
 export default function ResetPasswordPage({ navigateTo, showToast }) {
   const { resetPassword, isSupabaseConfigured } = useAuth();
 
+  // Extract token from query parameter (?token=...)
   const searchParams = new URLSearchParams(window.location.search);
   const urlToken = searchParams.get('token') || '';
 
@@ -70,25 +70,26 @@ export default function ResetPasswordPage({ navigateTo, showToast }) {
   if (resetComplete) {
     return (
       <div className="min-h-[calc(100vh-10rem)] flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-md studio-card rounded-3xl shadow-2xl p-8 text-center space-y-6 animate-modal">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-500/12 border border-emerald-500/25 text-emerald-500 flex items-center justify-center mx-auto">
+        <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl p-8 text-center space-y-6 animate-in fade-in duration-200">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
             <CheckCircle2 className="w-8 h-8" />
           </div>
           <div className="space-y-2">
-            <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white">
+            <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">
               Password Updated!
             </h1>
             <p className="text-sm text-slate-600 dark:text-slate-300">
               Your new password is active. You can now sign in with your updated credentials.
             </p>
           </div>
-          <MagneticButton
+          <button
+            type="button"
             onClick={() => navigateTo('login')}
-            className="w-full flex items-center justify-center gap-2 py-3.5 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-950/25 cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 py-3.5 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-600/25 cursor-pointer"
           >
             <span>Continue to Sign In</span>
             <ArrowRight className="w-4 h-4" />
-          </MagneticButton>
+          </button>
         </div>
       </div>
     );
@@ -96,13 +97,13 @@ export default function ResetPasswordPage({ navigateTo, showToast }) {
 
   return (
     <div className="min-h-[calc(100vh-10rem)] flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md studio-card rounded-3xl shadow-2xl p-8 space-y-6 animate-in">
-        <div className="w-12 h-12 rounded-2xl bg-emerald-500/12 border border-emerald-500/25 text-emerald-500 flex items-center justify-center">
+      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl p-8 space-y-6 animate-in fade-in duration-200">
+        <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
           <ShieldCheck className="w-6 h-6" />
         </div>
 
         <div className="space-y-1.5">
-          <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+          <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
             Create new password
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -111,18 +112,16 @@ export default function ResetPasswordPage({ navigateTo, showToast }) {
         </div>
 
         {formError && (
-          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-700 dark:text-rose-300 text-xs sm:text-sm flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-500" />
+          <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300 text-xs sm:text-sm flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{formError}</span>
           </div>
         )}
 
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
+          {/* New Password */}
           <div className="space-y-1.5">
-            <label
-              htmlFor="reset-password"
-              className="block text-[11px] font-mono font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300"
-            >
+            <label htmlFor="reset-password" className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
               New Password
             </label>
             <div className="relative">
@@ -136,9 +135,10 @@ export default function ResetPasswordPage({ navigateTo, showToast }) {
                   if (fieldErrors.password) setFieldErrors((p) => ({ ...p, password: '' }));
                 }}
                 placeholder="Enter new password"
-                className={`studio-input w-full pl-10 pr-11 py-3 rounded-xl bg-slate-900/[0.02] dark:bg-white/[0.04] border text-sm text-slate-900 dark:text-white placeholder-slate-400 ${
-                  fieldErrors.password ? 'border-rose-400' : 'border-slate-900/12 dark:border-white/10'
-                }`}
+                className={`w-full pl-10 pr-11 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 border text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${fieldErrors.password
+                  ? 'border-rose-400 focus:ring-rose-500/20'
+                  : 'border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:ring-emerald-500/20'
+                  }`}
               />
               <button
                 type="button"
@@ -150,17 +150,26 @@ export default function ResetPasswordPage({ navigateTo, showToast }) {
               </button>
             </div>
             {fieldErrors.password && (
-              <p className="text-xs text-rose-500 font-medium">{fieldErrors.password}</p>
+              <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{fieldErrors.password}</p>
             )}
 
-            <PasswordChecklist rules={passwordRules} columns={1} />
+            <div className="grid grid-cols-1 gap-1 pt-1">
+              {passwordRules.map((rule) => (
+                <div
+                  key={rule.id}
+                  className={`flex items-center gap-1.5 text-[11px] font-medium ${rule.met ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'
+                    }`}
+                >
+                  <Check className={`w-3.5 h-3.5 shrink-0 ${rule.met ? 'opacity-100' : 'opacity-40'}`} />
+                  <span>{rule.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
+          {/* Confirm New Password */}
           <div className="space-y-1.5">
-            <label
-              htmlFor="reset-confirm-password"
-              className="block text-[11px] font-mono font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300"
-            >
+            <label htmlFor="reset-confirm-password" className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
               Confirm New Password
             </label>
             <div className="relative">
@@ -174,9 +183,10 @@ export default function ResetPasswordPage({ navigateTo, showToast }) {
                   if (fieldErrors.confirm_password) setFieldErrors((p) => ({ ...p, confirm_password: '' }));
                 }}
                 placeholder="Re-enter new password"
-                className={`studio-input w-full pl-10 pr-11 py-3 rounded-xl bg-slate-900/[0.02] dark:bg-white/[0.04] border text-sm text-slate-900 dark:text-white placeholder-slate-400 ${
-                  fieldErrors.confirm_password ? 'border-rose-400' : 'border-slate-900/12 dark:border-white/10'
-                }`}
+                className={`w-full pl-10 pr-11 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 border text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${fieldErrors.confirm_password
+                  ? 'border-rose-400 focus:ring-rose-500/20'
+                  : 'border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus:ring-emerald-500/20'
+                  }`}
               />
               <button
                 type="button"
@@ -188,14 +198,14 @@ export default function ResetPasswordPage({ navigateTo, showToast }) {
               </button>
             </div>
             {fieldErrors.confirm_password && (
-              <p className="text-xs text-rose-500 font-medium">{fieldErrors.confirm_password}</p>
+              <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{fieldErrors.confirm_password}</p>
             )}
           </div>
 
-          <MagneticButton
+          <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full flex items-center justify-center gap-2 py-3.5 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-950/25 disabled:opacity-60 cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 py-3.5 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-600/25 transition-all disabled:opacity-60 cursor-pointer"
           >
             {isSubmitting ? (
               <>
@@ -208,9 +218,10 @@ export default function ResetPasswordPage({ navigateTo, showToast }) {
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
-          </MagneticButton>
+          </button>
         </form>
       </div>
     </div>
   );
 }
+

@@ -29,8 +29,8 @@ export const PRESETS = [
   {
     id: "fast",
     label: "Fast Mode",
-    badge: "18 Steps • 512px",
-    desc: "Prioritizes speed while preserving strong FLUX.1 Dev visual coherence.",
+    badge: "4 Steps • 512px",
+    desc: "Sub-10s distilled inference with FLUX.2 Klein 4B Q4 visual coherence.",
     dimensions: {
       "1:1": "512×512",
       "4:5": "512×640",
@@ -40,8 +40,8 @@ export const PRESETS = [
   {
     id: "quality",
     label: "Quality Mode",
-    badge: "26 Steps • 768px",
-    desc: "Higher resolution and detail for photorealistic campaign posters.",
+    badge: "8 Steps • 768px",
+    desc: "Higher resolution and extended detail for photorealistic campaign posters.",
     dimensions: {
       "1:1": "768×768",
       "4:5": "640×800",

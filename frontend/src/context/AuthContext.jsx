@@ -139,7 +139,12 @@ export function AuthProvider({ children, onAuthEvent }) {
         if (!mounted) return;
         if (event === 'PASSWORD_RECOVERY') {
           if (session?.access_token) setApiAuthToken(session.access_token);
-          if (onAuthEvent) onAuthEvent('PASSWORD_RECOVERY');
+          if (onAuthEvent) {
+            onAuthEvent('PASSWORD_RECOVERY');
+          } else {
+            window.history.pushState({ pageId: 'reset-password' }, '', '/reset-password');
+            window.dispatchEvent(new PopStateEvent('popstate'));
+          }
           return;
         }
         if (session?.access_token && session?.user) {

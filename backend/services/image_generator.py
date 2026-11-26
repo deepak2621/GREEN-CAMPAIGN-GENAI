@@ -1,7 +1,7 @@
 """
-FLUX.1 Dev Q4 GGUF Image Generation Service for Green Campaign AI.
-Integrates local ComfyUI workflow utilizing Black Forest Labs' FLUX.1 Dev (12B).
-Quantization: Q4_K_S GGUF (city96/FLUX.1-dev-gguf) + T5-XXL Q4_K_M GGUF + CLIP-L + FLUX VAE.
+FLUX.2 Klein 4B Q4_K_M Image Generation Service for Green Campaign AI.
+Integrates local ComfyUI workflow utilizing Black Forest Labs' FLUX.2 Klein 4B (Distilled).
+Quantization: Q4_K_M GGUF (moonbox-dev/FLUX.2-klein-4B-GGUF) + Qwen3-4B (qwen_3_4b.safetensors) + FLUX.2 VAE.
 Optimized for NVIDIA GPU (6-8 GB VRAM) with 16 GB System RAM on Windows.
 Features:
 - Single ComfyUI process & single generation execution lock (no duplicate loads or concurrent OOM).
@@ -28,7 +28,7 @@ import requests
 from PIL import Image
 
 from backend.config import Config
-from backend.services.model_config import Flux1DevConfig
+from backend.services.model_config import Flux2KleinConfig
 
 logger = logging.getLogger("green_campaign_ai")
 if not logger.handlers:
@@ -73,16 +73,46 @@ class CancelledGenerationError(GenerationError):
 class ComfyUIProcessManager:
     """Thread-safe singleton manager for the local ComfyUI server lifecycle."""
     _process = None
+    _log_handle = None
     _lock = threading.Lock()
 
     @classmethod
     def is_running(cls) -> bool:
         """Checks whether the ComfyUI HTTP server is responsive."""
         try:
-            res = requests.get(f"{Flux1DevConfig.COMFY_URL}/system_stats", timeout=3)
+            res = requests.get(f"{Flux2KleinConfig.COMFY_URL}/system_stats", timeout=3)
             return res.status_code == 200
         except Exception:
             return False
+
+    @classmethod
+    def terminate_server(cls) -> None:
+        """Terminates any managed or stale ComfyUI server holding COMFY_PORT."""
+        if cls._process is not None:
+            try:
+                if cls._process.poll() is None:
+                    cls._process.terminate()
+                    cls._process.wait(timeout=5)
+            except Exception:
+                try:
+                    cls._process.kill()
+                except Exception:
+                    pass
+            cls._process = None
+
+        port_str = str(Flux2KleinConfig.COMFY_PORT)
+        try:
+            for proc in psutil.process_iter(["pid", "name", "cmdline"]):
+                try:
+                    cmd = proc.info.get("cmdline") or []
+                    joined = " ".join(str(x) for x in cmd)
+                    if "main.py" in joined and port_str in joined and "ComfyUI" in joined:
+                        logger.warning("Terminating stale/unhealthy ComfyUI PID %s on port %s", proc.info["pid"], port_str)
+                        proc.kill()
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
+        except Exception:
+            pass
 
     @classmethod
     def ensure_server(cls) -> bool:
@@ -94,7 +124,10 @@ class ComfyUIProcessManager:
             if cls.is_running():
                 return True
 
-            comfy_dir = Flux1DevConfig.COMFY_DIR
+            # Clean up any zombie/CUDA-crashed ComfyUI still holding port 8188
+            cls.terminate_server()
+
+            comfy_dir = Flux2KleinConfig.COMFY_DIR
             main_py = comfy_dir / "main.py"
             if not main_py.exists():
                 raise ConfigurationError(
@@ -103,34 +136,57 @@ class ComfyUIProcessManager:
                 )
 
             logger.info(
-                "Launching local ComfyUI server for FLUX.1 Dev Q4 GGUF "
-                "(PyTorch SDPA, FP8 text encoder, 0.6GB VRAM reserve, smart LRU cache)..."
+                "Launching local ComfyUI server for FLUX.2 Klein 4B Q4_K_M "
+                "(CPU text-encoder offload --lowvram, FP8 TE, PyTorch SDPA, 1.0GB VRAM reserve, fast-disk)..."
             )
             cmd = [
                 "python",
                 str(main_py),
-                "--listen", Flux1DevConfig.COMFY_HOST,
-                "--port", str(Flux1DevConfig.COMFY_PORT),
+                "--listen", Flux2KleinConfig.COMFY_HOST,
+                "--port", str(Flux2KleinConfig.COMFY_PORT),
                 "--disable-auto-launch",
+                "--lowvram",
                 "--fp8_e4m3fn-text-enc",
                 "--use-pytorch-cross-attention",
-                "--reserve-vram", "0.6",
+                "--reserve-vram", "1.0",
                 "--fast-disk",
             ]
 
-            creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+            log_dir = Path(Config.GENERATED_IMAGES_DIR).parent / "logs"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            log_path = log_dir / "comfyui_server.log"
+            if cls._log_handle is not None:
+                try:
+                    cls._log_handle.close()
+                except Exception:
+                    pass
+                cls._log_handle = None
+            cls._log_handle = open(log_path, "a", encoding="utf-8", buffering=1)
+
+            env = os.environ.copy()
+            env["PYTHONUNBUFFERED"] = "1"
+            env["TQDM_DISABLE"] = "1"
+
+            creationflags = (
+                (subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP)
+                if os.name == "nt"
+                else 0
+            )
             cls._process = subprocess.Popen(
                 cmd,
                 cwd=str(comfy_dir),
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                stdout=cls._log_handle,
+                stderr=cls._log_handle,
+                env=env,
+                close_fds=True,
                 creationflags=creationflags,
             )
 
             for _ in range(45):
                 time.sleep(1)
                 if cls.is_running():
-                    logger.info("Local ComfyUI server online on port %d", Flux1DevConfig.COMFY_PORT)
+                    logger.info("Local ComfyUI server online on port %d", Flux2KleinConfig.COMFY_PORT)
                     return True
 
             raise ModelNotReadyError(
@@ -204,7 +260,7 @@ class SystemMonitor:
         torch_version = None
 
         try:
-            res = requests.get(f"{Flux1DevConfig.COMFY_URL}/system_stats", timeout=2)
+            res = requests.get(f"{Flux2KleinConfig.COMFY_URL}/system_stats", timeout=2)
             if res.status_code == 200:
                 comfy_online = True
                 data = res.json()
@@ -220,7 +276,7 @@ class SystemMonitor:
                         "vram_free_mb": free_mb,
                         "vram_used_mb": max(0, tot_mb - free_mb),
                     }
-            q_res = requests.get(f"{Flux1DevConfig.COMFY_URL}/queue", timeout=2)
+            q_res = requests.get(f"{Flux2KleinConfig.COMFY_URL}/queue", timeout=2)
             if q_res.status_code == 200:
                 qd = q_res.json()
                 queue_running = len(qd.get("queue_running", []))
@@ -268,7 +324,7 @@ class SystemMonitor:
 
 class ImageGeneratorService:
     """
-    Primary image generation service powered by FLUX.1 Dev Q4_K_S GGUF via ComfyUI.
+    Primary image generation service powered by FLUX.2 Klein 4B Q4_K_M GGUF via ComfyUI.
     Supports synchronous generation, asynchronous jobs with WebSocket progress,
     cancellation, single-execution queuing, and CUDA OOM recovery.
     """
@@ -302,52 +358,49 @@ class ImageGeneratorService:
         return SystemMonitor.get_metrics(active_job=active)
 
     @staticmethod
-    def _build_flux1_dev_workflow(
+    def _build_flux2_klein_workflow(
         prompt: str,
         width: int,
         height: int,
         seed: int,
         steps: int,
-        guidance: float,
+        cfg: float,
         sampler: str,
-        scheduler: str,
     ) -> dict:
         """
-        Constructs the 14-node FLUX.1 Dev Q4 GGUF workflow for ComfyUI:
-        1. UnetLoaderGGUF: flux1-dev-Q4_K_S.gguf
-        2. DualCLIPLoaderGGUF: t5-v1_1-xxl-encoder-Q4_K_M.gguf + clip_l.safetensors (type=flux)
-        3. VAELoader: ae.safetensors
-        4. CLIPTextEncode: user prompt
-        5. FluxGuidance: distilled guidance embedding (3.5)
-        6. ModelSamplingFlux: resolution-aware flow-matching shift
-        7. BasicGuider: single-pass guidance (optimal speed for distilled guidance)
-        8. EmptySD3LatentImage: 16-channel FLUX latent
-        9. KSamplerSelect: euler
-        10. BasicScheduler: simple / beta schedule
-        11. RandomNoise: reproducible seed
-        12. SamplerCustomAdvanced: flow-matching sampling
-        13. VAEDecode: latent -> image
-        14. PreviewImage: temporary ComfyUI output (avoids duplicate permanent files in ComfyUI/output)
+        Constructs the 13-node FLUX.2 Klein 4B Q4_K_M GGUF workflow for ComfyUI:
+        1. UnetLoaderGGUF: flux-2-klein-4b-Q4_K_M.gguf
+        2. CLIPLoader: qwen_3_4b.safetensors (type="flux2")
+        3. VAELoader: flux2-vae.safetensors
+        4. CLIPTextEncode: positive prompt
+        5. ConditioningZeroOut: zero negative conditioning
+        6. CFGGuider: cfg=1.0 for distilled flow matching
+        7. EmptyFlux2LatentImage: latent tensor
+        8. KSamplerSelect: euler
+        9. Flux2Scheduler: distilled schedule
+        10. RandomNoise: reproducible seed
+        11. SamplerCustomAdvanced: flow-matching sampling
+        12. VAEDecode: latent -> image
+        13. PreviewImage: temporary ComfyUI output (clean, avoids duplicate output files)
         """
         return {
             "1": {
-                "inputs": {"unet_name": Flux1DevConfig.UNET_NAME},
+                "inputs": {"unet_name": Flux2KleinConfig.UNET_NAME},
                 "class_type": "UnetLoaderGGUF",
-                "_meta": {"title": "FLUX.1 Dev Q4_K_S UNet (GGUF)"},
+                "_meta": {"title": "FLUX.2 Klein 4B Q4_K_M UNet (GGUF)"},
             },
             "2": {
                 "inputs": {
-                    "clip_name1": Flux1DevConfig.T5_XXL_NAME,
-                    "clip_name2": Flux1DevConfig.CLIP_L_NAME,
-                    "type": "flux",
+                    "clip_name": Flux2KleinConfig.CLIP_NAME,
+                    "type": "flux2",
                 },
-                "class_type": "DualCLIPLoaderGGUF",
-                "_meta": {"title": "Dual CLIP + T5-XXL Q4_K_M (GGUF)"},
+                "class_type": "CLIPLoader",
+                "_meta": {"title": "Qwen3-4B Text Encoder (FLUX.2)"},
             },
             "3": {
-                "inputs": {"vae_name": Flux1DevConfig.VAE_NAME},
+                "inputs": {"vae_name": Flux2KleinConfig.VAE_NAME},
                 "class_type": "VAELoader",
-                "_meta": {"title": "FLUX.1 VAE (ae.safetensors)"},
+                "_meta": {"title": "FLUX.2 VAE"},
             },
             "4": {
                 "inputs": {"text": prompt, "clip": ["2", 0]},
@@ -355,92 +408,84 @@ class ImageGeneratorService:
                 "_meta": {"title": "Positive Prompt"},
             },
             "5": {
-                "inputs": {"conditioning": ["4", 0], "guidance": float(guidance)},
-                "class_type": "FluxGuidance",
-                "_meta": {"title": f"FluxGuidance ({guidance})"},
+                "inputs": {"conditioning": ["4", 0]},
+                "class_type": "ConditioningZeroOut",
+                "_meta": {"title": "Zero Negative Conditioning"},
             },
             "6": {
                 "inputs": {
                     "model": ["1", 0],
-                    "max_shift": 1.15,
-                    "base_shift": 0.5,
-                    "width": width,
-                    "height": height,
+                    "positive": ["4", 0],
+                    "negative": ["5", 0],
+                    "cfg": float(cfg),
                 },
-                "class_type": "ModelSamplingFlux",
-                "_meta": {"title": "ModelSamplingFlux"},
+                "class_type": "CFGGuider",
+                "_meta": {"title": f"CFGGuider ({cfg})"},
             },
             "7": {
-                "inputs": {"model": ["6", 0], "conditioning": ["5", 0]},
-                "class_type": "BasicGuider",
-                "_meta": {"title": "BasicGuider"},
+                "inputs": {"width": width, "height": height, "batch_size": Flux2KleinConfig.BATCH_SIZE},
+                "class_type": "EmptyFlux2LatentImage",
+                "_meta": {"title": f"Empty FLUX.2 Latent ({width}x{height})"},
             },
             "8": {
-                "inputs": {"width": width, "height": height, "batch_size": Flux1DevConfig.BATCH_SIZE},
-                "class_type": "EmptySD3LatentImage",
-                "_meta": {"title": f"Empty FLUX Latent ({width}x{height})"},
-            },
-            "9": {
                 "inputs": {"sampler_name": sampler},
                 "class_type": "KSamplerSelect",
                 "_meta": {"title": f"KSamplerSelect ({sampler})"},
             },
-            "10": {
+            "9": {
                 "inputs": {
-                    "model": ["6", 0],
-                    "scheduler": scheduler,
                     "steps": int(steps),
-                    "denoise": 1.0,
+                    "width": width,
+                    "height": height,
                 },
-                "class_type": "BasicScheduler",
-                "_meta": {"title": f"BasicScheduler ({scheduler}, {steps} steps)"},
+                "class_type": "Flux2Scheduler",
+                "_meta": {"title": f"Flux2Scheduler ({steps} steps)"},
             },
-            "11": {
+            "10": {
                 "inputs": {"noise_seed": int(seed)},
                 "class_type": "RandomNoise",
                 "_meta": {"title": "RandomNoise"},
             },
-            "12": {
+            "11": {
                 "inputs": {
-                    "noise": ["11", 0],
-                    "guider": ["7", 0],
-                    "sampler": ["9", 0],
-                    "sigmas": ["10", 0],
-                    "latent_image": ["8", 0],
+                    "noise": ["10", 0],
+                    "guider": ["6", 0],
+                    "sampler": ["8", 0],
+                    "sigmas": ["9", 0],
+                    "latent_image": ["7", 0],
                 },
                 "class_type": "SamplerCustomAdvanced",
                 "_meta": {"title": "SamplerCustomAdvanced"},
             },
-            "13": {
-                "inputs": {"samples": ["12", 0], "vae": ["3", 0]},
+            "12": {
+                "inputs": {"samples": ["11", 0], "vae": ["3", 0]},
                 "class_type": "VAEDecode",
                 "_meta": {"title": "VAE Decode"},
             },
-            "14": {
-                "inputs": {"images": ["13", 0]},
+            "13": {
+                "inputs": {"images": ["12", 0]},
                 "class_type": "PreviewImage",
                 "_meta": {"title": "PreviewImage Output"},
             },
         }
 
     def _validate_request_and_hardware(self, prompt_data: dict) -> tuple[str, dict, int, dict]:
-        if not Flux1DevConfig.is_checkpoint_available():
+        if not Flux2KleinConfig.is_checkpoint_available():
             raise ConfigurationError(
-                "FLUX.1 Dev model files not found in ComfyUI models directory. "
-                f"UNet({Flux1DevConfig.UNET_NAME}): {Flux1DevConfig.UNET_PATH.exists()}, "
-                f"CLIP-L({Flux1DevConfig.CLIP_L_NAME}): {Flux1DevConfig.CLIP_L_PATH.exists()}, "
-                f"T5-XXL({Flux1DevConfig.T5_XXL_NAME}): {Flux1DevConfig.T5_XXL_PATH.exists()}, "
-                f"VAE({Flux1DevConfig.VAE_NAME}): {Flux1DevConfig.VAE_PATH.exists()}."
+                "FLUX.2 Klein files not found in ComfyUI models directory. "
+                f"UNet({Flux2KleinConfig.UNET_NAME}): {Flux2KleinConfig.UNET_PATH.exists()}, "
+                f"CLIP({Flux2KleinConfig.CLIP_NAME}): {Flux2KleinConfig.CLIP_PATH.exists()}, "
+                f"VAE({Flux2KleinConfig.VAE_NAME}): {Flux2KleinConfig.VAE_PATH.exists()}."
             )
 
         prompt = (prompt_data.get("prompt") or "").strip()
         if not prompt:
             raise GenerationError("Cannot generate image with an empty prompt.")
 
-        preset_id = (prompt_data.get("preset") or Flux1DevConfig.DEFAULT_PRESET).strip().lower()
-        preset = Flux1DevConfig.get_preset(preset_id)
+        preset_id = (prompt_data.get("preset") or Flux2KleinConfig.DEFAULT_PRESET).strip().lower()
+        preset = Flux2KleinConfig.get_preset(preset_id)
 
-        dimensions = prompt_data.get("dimensions") or Flux1DevConfig.get_dimensions(
+        dimensions = prompt_data.get("dimensions") or Flux2KleinConfig.get_dimensions(
             aspect_ratio=prompt_data.get("aspect_ratio", "1:1"),
             preset_id=preset["id"],
         )
@@ -453,10 +498,8 @@ class ImageGeneratorService:
         else:
             seed = max(0, min(2 ** 32 - 1, int(str(raw_seed).strip())))
 
-        # Pre-flight GPU VRAM check (never crash blindly if another app holds all VRAM)
         smi = SystemMonitor.query_nvidia_smi()
         if smi and smi["vram_total_mb"] > 0 and smi["vram_free_mb"] < 900:
-            # Ask ComfyUI to free any cached tensors/models first before failing
             self._free_comfy_memory()
 
         return prompt, {"width": width, "height": height}, seed, preset
@@ -465,7 +508,7 @@ class ImageGeneratorService:
     def _free_comfy_memory():
         try:
             requests.post(
-                f"{Flux1DevConfig.COMFY_URL}/free",
+                f"{Flux2KleinConfig.COMFY_URL}/free",
                 json={"unload_models": True, "free_memory": True},
                 timeout=5,
             )
@@ -493,11 +536,9 @@ class ImageGeneratorService:
 
     def start_job(self, prompt_data: dict, metadata: dict | None = None, user_id: str | None = None) -> dict:
         """
-        Starts an asynchronous FLUX.1 Dev generation job and returns immediately with job status.
-        Prevents concurrent GPU execution via a single-execution lock and rejects duplicate active jobs per user.
+        Starts an asynchronous FLUX.2 Klein 4B Q4 generation job and returns immediately with job status.
         """
         prompt, dims, seed, preset = self._validate_request_and_hardware(prompt_data)
-        ComfyUIProcessManager.ensure_server()
 
         with self._jobs_lock:
             for existing in self._jobs.values():
@@ -574,8 +615,8 @@ class ImageGeneratorService:
 
         try:
             if prompt_id:
-                requests.post(f"{Flux1DevConfig.COMFY_URL}/queue", json={"delete": [prompt_id]}, timeout=3)
-            requests.post(f"{Flux1DevConfig.COMFY_URL}/interrupt", timeout=3)
+                requests.post(f"{Flux2KleinConfig.COMFY_URL}/queue", json={"delete": [prompt_id]}, timeout=3)
+            requests.post(f"{Flux2KleinConfig.COMFY_URL}/interrupt", timeout=3)
         except Exception:
             pass
 
@@ -590,6 +631,14 @@ class ImageGeneratorService:
 
     def _run_job_thread(self, job_id: str, prompt_data: dict, prompt: str, dims: dict, seed: int, preset: dict):
         try:
+            if not ComfyUIProcessManager.is_running():
+                self._update_job(
+                    job_id,
+                    status="loading_model",
+                    stage="Starting local ComfyUI inference engine...",
+                    progress_pct=1.0,
+                )
+            ComfyUIProcessManager.ensure_server()
             result = self._execute_pipeline(prompt_data, prompt, dims, seed, preset, job_id=job_id)
             job_snapshot = self.get_job(job_id)
             if job_snapshot and job_snapshot.get("cancel_requested"):
@@ -601,14 +650,15 @@ class ImageGeneratorService:
                 "negative_prompt": prompt_data.get("negative_prompt", ""),
                 "seed": result["seed"],
                 "model": result["model"],
-                "developer": Flux1DevConfig.DEVELOPER,
-                "architecture": Flux1DevConfig.ARCHITECTURE,
+                "developer": Flux2KleinConfig.DEVELOPER,
+                "architecture": Flux2KleinConfig.ARCHITECTURE,
                 "quantization": result["quantization"],
                 "license": result["license"],
                 "preset": result["preset"],
                 "preset_label": result["preset_label"],
                 "steps": result["steps"],
                 "guidance_scale": result["guidance_scale"],
+                "cfg_scale": result["cfg_scale"],
                 "sampler": result["sampler"],
                 "scheduler": result["scheduler"],
                 "model_load_time_sec": result["model_load_time_sec"],
@@ -638,14 +688,47 @@ class ImageGeneratorService:
                 stage="Generation cancelled.",
                 error="Generation was cancelled by user.",
                 error_type="CancelledGenerationError",
+                error_code="CANCELLED",
             )
         except CudaOOMError as e:
-            self._update_job(job_id, status="error", stage="GPU memory limit reached", error=str(e), error_type="CudaOOMError")
+            self._update_job(
+                job_id,
+                status="error",
+                stage="GPU memory limit reached",
+                error=str(e),
+                error_type="CudaOOMError",
+                error_code="GPU_MEMORY_EXHAUSTED",
+            )
         except ConfigurationError as e:
-            self._update_job(job_id, status="error", stage="Configuration error", error=str(e), error_type="ConfigurationError")
+            self._update_job(
+                job_id,
+                status="error",
+                stage="Configuration error",
+                error=str(e),
+                error_type="ConfigurationError",
+                error_code="MODEL_CONFIGURATION_ERROR",
+            )
+        except ModelNotReadyError as e:
+            self._update_job(
+                job_id,
+                status="error",
+                stage="Image-generation engine unavailable",
+                error=str(e),
+                error_type="ModelNotReadyError",
+                error_code="MODEL_UNAVAILABLE",
+            )
         except Exception as e:
             logger.exception("Async generation job %s failed", job_id)
-            self._update_job(job_id, status="error", stage="Generation failed", error=str(e), error_type="GenerationError")
+            err_msg = str(e)
+            err_code = "GENERATION_TIMEOUT" if "timed out" in err_msg.lower() else "GENERATION_FAILED"
+            self._update_job(
+                job_id,
+                status="error",
+                stage="Generation failed",
+                error=err_msg,
+                error_type="GenerationError",
+                error_code=err_code,
+            )
 
     def generate(self, prompt_data: dict) -> dict:
         """Synchronous generation entry point used by /api/generate and automated tests."""
@@ -665,6 +748,7 @@ class ImageGeneratorService:
         width = dims["width"]
         height = dims["height"]
         steps = preset["steps"]
+        cfg = preset["cfg"]
         guidance = preset["guidance"]
         sampler = preset["sampler"]
         scheduler = preset["scheduler"]
@@ -681,23 +765,22 @@ class ImageGeneratorService:
                 client_id = f"green_ai_{uuid.uuid4().hex[:8]}"
 
                 logger.info("=" * 80)
-                logger.info("FLUX.1 DEV Q4 GGUF GENERATION DISPATCH (%s)", preset["label"].upper())
+                logger.info("FLUX.2 KLEIN 4B Q4_K_M GENERATION DISPATCH (%s)", preset["label"].upper())
                 logger.info(
-                    "Model: %s | Resolution: %dx%d | Seed: %d | Steps: %d | Guidance: %.1f | %s/%s",
-                    Flux1DevConfig.MODEL_NAME, width, height, seed, steps, guidance, sampler, scheduler,
+                    "Model: %s | Resolution: %dx%d | Seed: %d | Steps: %d | CFG: %.1f | %s/%s",
+                    Flux2KleinConfig.MODEL_NAME, width, height, seed, steps, cfg, sampler, scheduler,
                 )
                 logger.info("PROMPT: %s", prompt)
                 logger.info("=" * 80)
 
-                workflow = self._build_flux1_dev_workflow(
+                workflow = self._build_flux2_klein_workflow(
                     prompt=prompt,
                     width=width,
                     height=height,
                     seed=seed,
                     steps=steps,
-                    guidance=guidance,
+                    cfg=cfg,
                     sampler=sampler,
-                    scheduler=scheduler,
                 )
 
                 image_bytes, model_load_sec = asyncio.run(
@@ -728,21 +811,22 @@ class ImageGeneratorService:
 
                 saved_info.update({
                     "seed": seed,
-                    "model": Flux1DevConfig.MODEL_NAME,
-                    "developer": Flux1DevConfig.DEVELOPER,
-                    "architecture": Flux1DevConfig.ARCHITECTURE,
-                    "provider": Flux1DevConfig.PROVIDER,
+                    "model": Flux2KleinConfig.MODEL_NAME,
+                    "developer": Flux2KleinConfig.DEVELOPER,
+                    "architecture": Flux2KleinConfig.ARCHITECTURE,
+                    "provider": Flux2KleinConfig.PROVIDER,
                     "preset": preset["id"],
                     "preset_label": preset["label"],
                     "steps": steps,
                     "guidance_scale": guidance,
+                    "cfg_scale": cfg,
                     "sampler": sampler,
                     "scheduler": scheduler,
                     "model_load_time_sec": round(model_load_sec, 2),
                     "generation_time_sec": duration_sec,
-                    "license": Flux1DevConfig.LICENSE,
-                    "quantization": Flux1DevConfig.QUANTIZATION,
-                    "execution": Flux1DevConfig.EXECUTION_PROFILE,
+                    "license": Flux2KleinConfig.LICENSE,
+                    "quantization": Flux2KleinConfig.QUANTIZATION,
+                    "execution": Flux2KleinConfig.EXECUTION_PROFILE,
                 })
                 return saved_info
             finally:
@@ -760,7 +844,7 @@ class ImageGeneratorService:
         timeout: int = 300,
     ) -> tuple[bytes, float]:
         """Connects to ComfyUI WebSocket, submits workflow, streams real progress, and fetches output bytes."""
-        ws_url = f"{Flux1DevConfig.COMFY_WS_URL}?clientId={client_id}"
+        ws_url = f"{Flux2KleinConfig.COMFY_WS_URL}?clientId={client_id}"
         http_timeout = aiohttp.ClientTimeout(total=30)
 
         load_start: float | None = None
@@ -773,7 +857,7 @@ class ImageGeneratorService:
                 self._update_job(job_id, status="loading_model", stage="Submitting workflow to ComfyUI...", progress_pct=2.0)
 
                 async with session.post(
-                    f"{Flux1DevConfig.COMFY_URL}/prompt",
+                    f"{Flux2KleinConfig.COMFY_URL}/prompt",
                     json={"prompt": workflow, "client_id": client_id},
                     timeout=http_timeout,
                 ) as resp:
@@ -790,7 +874,8 @@ class ImageGeneratorService:
                     if not prompt_id:
                         raise GenerationError("ComfyUI did not return a valid prompt ID.")
 
-                self._update_job(job_id, prompt_id=prompt_id, status="loading_model", stage="Preparing FLUX.1 Dev model...", progress_pct=5.0)
+                self._update_job(job_id, prompt_id=prompt_id, status="loading_model", stage="Preparing FLUX.2 Klein 4B model...", progress_pct=5.0)
+                last_health_check = time.time()
 
                 while time.time() - start_wall < timeout:
                     if job_id:
@@ -801,10 +886,21 @@ class ImageGeneratorService:
                     try:
                         msg = await asyncio.wait_for(ws.receive(), timeout=1.0)
                     except asyncio.TimeoutError:
-                        # Periodic history fallback check in case execution completed right between messages
                         done, out_bytes = await self._check_history_async(session, prompt_id)
                         if done:
                             return out_bytes, model_load_sec
+                        if time.time() - last_health_check >= 8.0:
+                            last_health_check = time.time()
+                            try:
+                                async with session.get(f"{Flux2KleinConfig.COMFY_URL}/system_stats", timeout=aiohttp.ClientTimeout(total=4)) as h_res:
+                                    if h_res.status >= 500:
+                                        ComfyUIProcessManager.terminate_server()
+                                        raise CudaOOMError(
+                                            "ComfyUI GPU worker encountered a CUDA Out-of-Memory state and was reset. "
+                                            "Please retry in Fast Mode (512x512)."
+                                        )
+                            except (aiohttp.ClientError, asyncio.TimeoutError):
+                                pass
                         continue
 
                     if msg.type == aiohttp.WSMsgType.TEXT:
@@ -818,7 +914,6 @@ class ImageGeneratorService:
                         if msg_type == "executing":
                             node = data.get("node")
                             if node is None:
-                                # Execution completed for this prompt_id
                                 break
                             if node in ("1", "2", "3"):
                                 if load_start is None:
@@ -826,34 +921,34 @@ class ImageGeneratorService:
                                 self._update_job(
                                     job_id,
                                     status="loading_model",
-                                    stage="Loading FLUX.1 Dev Q4 & T5-XXL into GPU/RAM...",
+                                    stage="Loading FLUX.2 Klein 4B Q4 & Qwen3-4B into GPU/RAM...",
                                     progress_pct=6.0,
                                 )
-                            elif node in ("4", "5", "6", "7", "8", "9", "10", "11"):
+                            elif node in ("4", "5", "6", "7", "8", "9", "10"):
                                 if load_start is not None and model_load_sec == 0.0:
                                     model_load_sec = time.time() - load_start
                                 self._update_job(
                                     job_id,
                                     status="encoding",
-                                    stage="Encoding campaign prompt with CLIP-L & T5-XXL...",
+                                    stage="Encoding campaign prompt with Qwen3-4B...",
                                     progress_pct=10.0,
                                     model_load_time_sec=round(model_load_sec, 2),
                                 )
-                            elif node == "12":
+                            elif node == "11":
                                 if load_start is not None and model_load_sec == 0.0:
                                     model_load_sec = time.time() - load_start
                                 self._update_job(
                                     job_id,
                                     status="sampling",
-                                    stage=f"Sampling FLUX.1 Dev (0/{steps} steps)...",
+                                    stage=f"Sampling FLUX.2 Klein 4B (0/{steps} steps)...",
                                     progress_pct=12.0,
                                     model_load_time_sec=round(model_load_sec, 2),
                                 )
-                            elif node in ("13", "14"):
+                            elif node in ("12", "13"):
                                 self._update_job(
                                     job_id,
                                     status="decoding",
-                                    stage="Decoding latent image with FLUX VAE...",
+                                    stage="Decoding latent image with FLUX.2 VAE...",
                                     progress_pct=96.0,
                                     step=steps,
                                 )
@@ -865,7 +960,7 @@ class ImageGeneratorService:
                             self._update_job(
                                 job_id,
                                 status="sampling",
-                                stage=f"Sampling FLUX.1 Dev ({val}/{mx} steps)...",
+                                stage=f"Sampling FLUX.2 Klein 4B ({val}/{mx} steps)...",
                                 progress_pct=pct,
                                 step=val,
                                 max_steps=mx,
@@ -879,25 +974,29 @@ class ImageGeneratorService:
                             if "out of memory" in exc_msg.lower():
                                 self._free_comfy_memory()
                                 raise CudaOOMError(
-                                    "CUDA Out of Memory during FLUX.1 Dev inference. "
+                                    "CUDA Out of Memory during FLUX.2 Klein 4B inference. "
                                     "Switch to Fast Mode (512x512) or close other GPU applications and retry."
+                                )
+                            if "errno 22" in exc_msg.lower() or "invalid argument" in exc_msg.lower():
+                                raise GenerationError(
+                                    "ComfyUI execution failed due to a broken console/stderr handle ([Errno 22]). "
+                                    "Restart the ComfyUI server (or restart Flask so it auto-launches ComfyUI cleanly) and retry."
                                 )
                             raise GenerationError(f"ComfyUI execution failed: {exc_msg}")
 
                     elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
                         break
 
-                # Fetch final image from ComfyUI history
                 for _ in range(15):
                     done, out_bytes = await self._check_history_async(session, prompt_id)
                     if done:
                         return out_bytes, model_load_sec
                     await asyncio.sleep(0.4)
 
-        raise GenerationError(f"FLUX.1 Dev generation timed out after {timeout} seconds.")
+        raise GenerationError(f"FLUX.2 Klein 4B generation timed out after {timeout} seconds.")
 
     async def _check_history_async(self, session: aiohttp.ClientSession, prompt_id: str) -> tuple[bool, bytes]:
-        async with session.get(f"{Flux1DevConfig.COMFY_URL}/history/{prompt_id}", timeout=aiohttp.ClientTimeout(total=10)) as res:
+        async with session.get(f"{Flux2KleinConfig.COMFY_URL}/history/{prompt_id}", timeout=aiohttp.ClientTimeout(total=10)) as res:
             if res.status != 200:
                 return False, b""
             history = await res.json()
@@ -911,20 +1010,25 @@ class ImageGeneratorService:
                 if "out of memory" in err_msg.lower():
                     self._free_comfy_memory()
                     raise CudaOOMError(
-                        "CUDA Out of Memory during FLUX.1 Dev inference. "
+                        "CUDA Out of Memory during FLUX.2 Klein 4B inference. "
                         "Try Fast Mode (512x512) or free GPU memory and retry."
+                    )
+                if "errno 22" in err_msg.lower() or "invalid argument" in err_msg.lower():
+                    raise GenerationError(
+                        "ComfyUI execution failed due to a broken console/stderr handle ([Errno 22]). "
+                        "Restart the ComfyUI server (or restart Flask so it auto-launches ComfyUI cleanly) and retry."
                     )
                 raise GenerationError(f"ComfyUI execution failed: {err_msg}")
 
             outputs = item.get("outputs", {})
-            save_node = outputs.get("14") or next((v for v in outputs.values() if "images" in v), {})
+            save_node = outputs.get("13") or next((v for v in outputs.values() if "images" in v), {})
             images = save_node.get("images", [])
             if not images:
                 return False, b""
 
             img_meta = images[0]
             url = (
-                f"{Flux1DevConfig.COMFY_URL}/view"
+                f"{Flux2KleinConfig.COMFY_URL}/view"
                 f"?filename={urllib.parse.quote(img_meta['filename'])}"
                 f"&subfolder={urllib.parse.quote(img_meta.get('subfolder', ''))}"
                 f"&type={urllib.parse.quote(img_meta.get('type', 'temp'))}"
@@ -937,7 +1041,11 @@ class ImageGeneratorService:
             raise GenerationError("Failed to fetch generated image data from ComfyUI.")
 
     def _process_and_save(self, image_bytes: bytes) -> dict:
-        """Validates and persists image as lossless PNG with Pillow."""
+        """Validates and persists image as lossless PNG with Pillow and verifies disk output."""
+        if not image_bytes:
+            raise GenerationError("Image generation returned empty image bytes.")
+
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         unique_id = uuid.uuid4().hex[:12]
         timestamp = int(time.time())
         filename = f"campaign_{unique_id}_{timestamp}.png"
@@ -945,9 +1053,20 @@ class ImageGeneratorService:
 
         try:
             with Image.open(io.BytesIO(image_bytes)) as image:
-                image.save(file_path, format="PNG", optimize=True)
-                width, height = image.width, image.height
+                rgb_image = image.convert("RGB") if image.mode not in ("RGB", "RGBA") else image
+                rgb_image.save(file_path, format="PNG", optimize=True)
+                width, height = rgb_image.width, rgb_image.height
+
+            if not file_path.is_file():
+                raise GenerationError("Generated image file was not created on disk.")
+
             file_size = os.path.getsize(file_path)
+            if file_size <= 0:
+                raise GenerationError("Generated image file on disk is empty.")
+
+            with Image.open(file_path) as saved_check:
+                saved_check.verify()
+
             return {
                 "filename": filename,
                 "file_path": str(file_path),
@@ -956,8 +1075,11 @@ class ImageGeneratorService:
                 "height": height,
                 "file_size": file_size,
             }
+        except GenerationError:
+            raise
         except Exception as e:
-            raise GenerationError(f"Pillow image processing error: {str(e)}")
+            logger.exception("Failed saving or verifying generated PNG '%s'", file_path)
+            raise GenerationError(f"Failed saving generated image: {str(e)}")
 
 
 image_generator_service = ImageGeneratorService()

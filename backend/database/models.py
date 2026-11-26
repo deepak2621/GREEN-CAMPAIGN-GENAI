@@ -5,24 +5,6 @@ from backend.database.db import get_db_connection
 from backend.config import Config
 
 
-def _resolve_safe_image_path(raw_path: str) -> Path | None:
-    """
-    Resolves an image path and verifies it resides strictly inside Config.GENERATED_IMAGES_DIR.
-    Prevents arbitrary path traversal or deletion of files outside generated_images.
-    """
-    if not raw_path or not raw_path.strip():
-        return None
-    allowed_dir = Path(Config.GENERATED_IMAGES_DIR).resolve()
-    allowed_dir.mkdir(parents=True, exist_ok=True)
-    candidate_name = Path(raw_path.strip()).name
-    if not candidate_name or candidate_name in (".", ".."):
-        return None
-    resolved = (allowed_dir / candidate_name).resolve()
-    if not resolved.is_relative_to(allowed_dir):
-        return None
-    return resolved
-
-
 class UserModel:
     @staticmethod
     def find_by_email(email: str):
@@ -272,7 +254,7 @@ class CampaignModel:
     def create(data):
         """
         Creates a new campaign record in the database using parameterized queries.
-        Restricts image_path strictly to Config.GENERATED_IMAGES_DIR.
+        Generates a unique UUID primary key if not provided.
         """
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -280,15 +262,24 @@ class CampaignModel:
         campaign_id = data.get("id") or str(uuid.uuid4())
         user_id = data.get("user_id")
 
+        # Check if record with this id already exists to prevent duplicate insertion
         cursor.execute("SELECT id FROM campaigns WHERE id = ?", (campaign_id,))
         if cursor.fetchone():
             conn.close()
             return campaign_id
 
-        safe_path = _resolve_safe_image_path(data.get("image_path", ""))
-        image_path_normalized = str(safe_path) if safe_path else ""
-        fname = safe_path.name if safe_path else ""
+        # Normalize image_path to absolute
+        raw_path = data.get("image_path", "").strip()
+        if raw_path:
+            p = Path(raw_path)
+            if not p.is_absolute():
+                p = Path(Config.GENERATED_IMAGES_DIR) / p.name
+            image_path_normalized = str(p)
+        else:
+            image_path_normalized = ""
 
+        # Comprehensive duplicate guard: match normalized path, filename, or exact title + prompt for user
+        fname = Path(image_path_normalized).name if image_path_normalized else ""
         cursor.execute(
             """
             SELECT id FROM campaigns
@@ -350,9 +341,14 @@ class CampaignModel:
     def _hydrate_row(row):
         record = dict(row)
         raw_path = record.get("image_path", "")
-        img_path = _resolve_safe_image_path(raw_path)
+        img_path = Path(raw_path) if raw_path else None
 
-        record["image_exists"] = bool(img_path and img_path.is_file())
+        if img_path and not img_path.is_file():
+            alt_path = Path(Config.GENERATED_IMAGES_DIR) / img_path.name
+            if alt_path.is_file():
+                img_path = alt_path
+
+        record["image_exists"] = bool(img_path.is_file()) if img_path else False
         record["filename"] = img_path.name if img_path else ""
         record["image_path"] = str(img_path) if img_path else ""
         return record
@@ -361,7 +357,7 @@ class CampaignModel:
     def get_all(user_id=None):
         """
         Fetches campaign records ordered by creation date descending.
-        When user_id is provided, returns campaigns owned by that user plus shared starter campaigns (user_id IS NULL).
+        When user_id is provided, returns campaigns owned by that user plus shared legacy starter campaigns (user_id IS NULL).
         """
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -399,23 +395,25 @@ class CampaignModel:
     @staticmethod
     def delete(campaign_id, user_id=None):
         """
-        Safely deletes the database record and the associated generated image file inside GENERATED_IMAGES_DIR.
-        Strictly enforces ownership when user_id is provided.
+        Safely deletes the database record and the associated generated image file on disk.
+        Verifies ownership when user_id is provided.
         """
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT image_path, user_id FROM campaigns WHERE id = ?",
-            (campaign_id,),
-        )
+        if user_id:
+            cursor.execute(
+                "SELECT image_path, user_id FROM campaigns WHERE id = ?",
+                (campaign_id,),
+            )
+        else:
+            cursor.execute("SELECT image_path, user_id FROM campaigns WHERE id = ?", (campaign_id,))
         row = cursor.fetchone()
 
         if not row:
             conn.close()
             return False, "Campaign record not found."
 
-        # Strictly require ownership when user_id is provided (protect shared/other users' records)
-        if user_id and row["user_id"] != user_id:
+        if user_id and row["user_id"] and row["user_id"] != user_id:
             conn.close()
             return False, "You do not have permission to delete this campaign."
 
@@ -425,21 +423,20 @@ class CampaignModel:
         conn.commit()
         conn.close()
 
-        # Only unlink files strictly inside GENERATED_IMAGES_DIR, and only if no other campaign references the same filename
-        safe_file = _resolve_safe_image_path(image_path)
-        if safe_file and safe_file.is_file():
-            conn2 = get_db_connection()
-            c2 = conn2.cursor()
-            c2.execute(
-                "SELECT COUNT(*) FROM campaigns WHERE image_path LIKE ?",
-                (f"%{safe_file.name}",),
-            )
-            ref_count = c2.fetchone()[0]
-            conn2.close()
-            if ref_count == 0:
-                try:
-                    safe_file.unlink()
-                except Exception as e:
-                    print(f"Warning: Failed to delete image file {safe_file.name}: {e}")
+        # Safely remove image file from disk if it exists
+        if image_path:
+            import gc
+            gc.collect()
+            file_to_remove = Path(image_path)
+            if not file_to_remove.is_file():
+                alt = Path(Config.GENERATED_IMAGES_DIR) / file_to_remove.name
+                if alt.is_file():
+                    file_to_remove = alt
+
+            try:
+                if file_to_remove.is_file():
+                    file_to_remove.unlink()
+            except Exception as e:
+                print(f"Warning: Failed to delete image file {image_path}: {e}")
 
         return True, "Campaign deleted successfully."

@@ -15,7 +15,7 @@ from backend.services.image_generator import (
     ModelNotReadyError,
 )
 from backend.config import Config
-from backend.services.model_config import Flux1DevConfig
+from backend.services.model_config import Flux2KleinConfig
 
 generation_bp = Blueprint("generation", __name__)
 logger = logging.getLogger("green_campaign_ai")
@@ -58,7 +58,7 @@ def _validate_and_build_generation_inputs(data: dict):
     image_style = (data.get("image_style") or "").strip()
     target_audience = (data.get("target_audience") or "").strip()
     aspect_ratio = (data.get("aspect_ratio") or "1:1").strip()
-    preset = (data.get("preset") or Flux1DevConfig.DEFAULT_PRESET).strip().lower()
+    preset = (data.get("preset") or Flux2KleinConfig.DEFAULT_PRESET).strip().lower()
     additional_instructions = (data.get("additional_instructions") or "").strip()
     custom_prompt = (data.get("custom_prompt") or "").strip()
 
@@ -102,7 +102,7 @@ def _validate_and_build_generation_inputs(data: dict):
     if aspect_ratio not in ALLOWED_ASPECT_RATIOS:
         aspect_ratio = "1:1"
     if preset not in ALLOWED_PRESETS:
-        preset = Flux1DevConfig.DEFAULT_PRESET
+        preset = Flux2KleinConfig.DEFAULT_PRESET
 
     raw_seed = data.get("seed")
     if raw_seed is not None and str(raw_seed).strip() != "":
@@ -148,6 +148,7 @@ def _map_generation_error(err: Exception):
         return jsonify({
             "success": False,
             "error_type": "RateLimitError",
+            "error_code": "RATE_LIMITED",
             "rate_limited": True,
             "retry_after": err.retry_after,
             "message": str(err),
@@ -156,50 +157,77 @@ def _map_generation_error(err: Exception):
         return jsonify({
             "success": False,
             "error_type": "ServiceBusyError",
+            "error_code": "SERVICE_BUSY",
             "message": str(err),
         }), 409
     if isinstance(err, ConfigurationError):
         return jsonify({
             "success": False,
             "error_type": "ConfigurationError",
+            "error_code": "MODEL_CONFIGURATION_ERROR",
             "message": str(err),
         }), 422
     if isinstance(err, CudaOOMError):
         return jsonify({
             "success": False,
             "error_type": "CudaOOMError",
+            "error_code": "GPU_MEMORY_EXHAUSTED",
             "message": str(err),
         }), 507
     if isinstance(err, ModelNotReadyError):
         return jsonify({
             "success": False,
             "error_type": "ModelNotReadyError",
+            "error_code": "MODEL_UNAVAILABLE",
             "message": str(err),
         }), 503
     if isinstance(err, GenerationError):
+        err_lower = str(err).lower()
+        error_code = "GENERATION_TIMEOUT" if "timed out" in err_lower else "GENERATION_FAILED"
         return jsonify({
             "success": False,
             "error_type": "GenerationError",
+            "error_code": error_code,
             "message": str(err),
         }), 502
     logger.exception("Unexpected error during image generation")
     return jsonify({
         "success": False,
         "error_type": "InternalError",
+        "error_code": "GENERATION_FAILED",
         "message": "Unexpected server error during image generation.",
     }), 500
+
+
+def _parse_json_body():
+    """Parses request JSON safely, returning (data, error_response)."""
+    raw_body = request.get_data(cache=True)
+    if not raw_body or not raw_body.strip():
+        return {}, None
+    parsed = request.get_json(silent=True)
+    if parsed is None or not isinstance(parsed, dict):
+        return None, (jsonify({
+            "success": False,
+            "error_type": "ValidationError",
+            "error_code": "INVALID_JSON",
+            "message": "Malformed JSON request payload.",
+        }), 400)
+    return parsed, None
 
 
 @generation_bp.route("/generate", methods=["POST"])
 @require_auth
 def generate_campaign_image():
-    """Synchronous FLUX.1 Dev Q4 GGUF image generation endpoint."""
-    data = request.get_json(silent=True) or {}
+    """Synchronous FLUX.2 Klein 4B Q4_K_M image generation endpoint."""
+    data, json_err = _parse_json_body()
+    if json_err:
+        return json_err
     parsed, errors = _validate_and_build_generation_inputs(data)
     if errors:
         return jsonify({
             "success": False,
             "error_type": "ValidationError",
+            "error_code": "INVALID_PROMPT",
             "message": "Please correct the highlighted form errors.",
             "errors": errors,
         }), 400
@@ -207,27 +235,31 @@ def generate_campaign_image():
     prompt_data, meta = parsed
     try:
         result = image_generator_service.generate(prompt_data)
+        image_url = f"/api/images/{result['filename']}"
         return jsonify({
             "success": True,
+            "message": "Your image has been generated successfully.",
+            "image_url": image_url,
             "data": {
                 **meta,
                 "generated_prompt": prompt_data["prompt"],
                 "negative_prompt": prompt_data["negative_prompt"],
                 "seed": result.get("seed"),
-                "model": result.get("model", Flux1DevConfig.MODEL_NAME),
-                "developer": result.get("developer", Flux1DevConfig.DEVELOPER),
-                "architecture": result.get("architecture", Flux1DevConfig.ARCHITECTURE),
-                "quantization": result.get("quantization", Flux1DevConfig.QUANTIZATION),
-                "license": result.get("license", Flux1DevConfig.LICENSE),
+                "model": result.get("model", Flux2KleinConfig.MODEL_NAME),
+                "developer": result.get("developer", Flux2KleinConfig.DEVELOPER),
+                "architecture": result.get("architecture", Flux2KleinConfig.ARCHITECTURE),
+                "quantization": result.get("quantization", Flux2KleinConfig.QUANTIZATION),
+                "license": result.get("license", Flux2KleinConfig.LICENSE),
                 "preset": result.get("preset", prompt_data["preset"]),
                 "preset_label": result.get("preset_label"),
                 "steps": result.get("steps"),
                 "guidance_scale": result.get("guidance_scale"),
+                "cfg_scale": result.get("cfg_scale"),
                 "sampler": result.get("sampler"),
                 "scheduler": result.get("scheduler"),
                 "model_load_time_sec": result.get("model_load_time_sec"),
                 "generation_time_sec": result.get("generation_time_sec"),
-                "image_url": f"/api/images/{result['filename']}",
+                "image_url": image_url,
                 "download_url": f"/api/images/{result['filename']}/download",
                 "filename": result["filename"],
                 "file_path": result["file_path"],
@@ -243,13 +275,16 @@ def generate_campaign_image():
 @generation_bp.route("/generate/start", methods=["POST"])
 @require_auth
 def start_async_generation():
-    """Asynchronous FLUX.1 Dev generation start endpoint with live step progress."""
-    data = request.get_json(silent=True) or {}
+    """Asynchronous FLUX.2 Klein 4B Q4 generation start endpoint with live step progress."""
+    data, json_err = _parse_json_body()
+    if json_err:
+        return json_err
     parsed, errors = _validate_and_build_generation_inputs(data)
     if errors:
         return jsonify({
             "success": False,
             "error_type": "ValidationError",
+            "error_code": "INVALID_PROMPT",
             "message": "Please correct the highlighted form errors.",
             "errors": errors,
         }), 400
@@ -257,7 +292,11 @@ def start_async_generation():
     prompt_data, meta = parsed
     try:
         job = image_generator_service.start_job(prompt_data, metadata=meta, user_id=g.current_user_id)
-        return jsonify({"success": True, "data": job}), 202
+        return jsonify({
+            "success": True,
+            "message": "Image generation job started.",
+            "data": job,
+        }), 202
     except Exception as e:
         return _map_generation_error(e)
 
@@ -268,10 +307,27 @@ def get_generation_status(job_id):
     """Returns real-time ComfyUI WebSocket progress and result for an async generation job."""
     job = image_generator_service.get_job(job_id)
     if not job:
-        return jsonify({"success": False, "message": "Generation job not found."}), 404
+        return jsonify({
+            "success": False,
+            "error_code": "JOB_NOT_FOUND",
+            "error_type": "NotFoundError",
+            "message": "Generation job not found.",
+        }), 404
     if job.get("user_id") and job["user_id"] != g.current_user_id:
-        return jsonify({"success": False, "message": "Access denied for this generation job."}), 403
-    return jsonify({"success": True, "data": job}), 200
+        return jsonify({
+            "success": False,
+            "error_code": "FORBIDDEN",
+            "error_type": "AuthorizationError",
+            "message": "Access denied for this generation job.",
+        }), 403
+    payload = {"success": True, "data": job}
+    if job.get("status") == "completed" and isinstance(job.get("result"), dict):
+        payload["message"] = "Your image has been generated successfully."
+        payload["image_url"] = job["result"].get("image_url", "")
+    elif job.get("status") == "error":
+        payload["message"] = job.get("error") or "Image generation failed."
+        payload["error_code"] = job.get("error_code") or "GENERATION_FAILED"
+    return jsonify(payload), 200
 
 
 @generation_bp.route("/generate/cancel/<job_id>", methods=["POST"])
@@ -281,14 +337,18 @@ def cancel_generation(job_id):
     ok, msg = image_generator_service.cancel_job(job_id, user_id=g.current_user_id)
     if not ok:
         status_code = 403 if "permission" in msg.lower() else 404 if "not found" in msg.lower() else 400
-        return jsonify({"success": False, "message": msg}), status_code
+        return jsonify({
+            "success": False,
+            "error_code": "CANCEL_FAILED",
+            "message": msg,
+        }), status_code
     return jsonify({"success": True, "message": msg}), 200
 
 
 @generation_bp.route("/preview-prompt", methods=["POST"])
 @require_auth
 def preview_campaign_prompt():
-    """Returns exact FLUX.1 Dev prompt, model config, and preset parameters before generation."""
+    """Returns exact FLUX.2 Klein 4B prompt, model config, and preset parameters before generation."""
     data = request.get_json(silent=True) or {}
 
     campaign_title = (data.get("campaign_title") or "").strip() or "Sustainability Education"
@@ -297,7 +357,7 @@ def preview_campaign_prompt():
     image_style = (data.get("image_style") or "Realistic Photography").strip()
     target_audience = (data.get("target_audience") or "General Public").strip()
     aspect_ratio = (data.get("aspect_ratio") or "1:1").strip()
-    preset_id = (data.get("preset") or Flux1DevConfig.DEFAULT_PRESET).strip().lower()
+    preset_id = (data.get("preset") or Flux2KleinConfig.DEFAULT_PRESET).strip().lower()
     additional_instructions = (data.get("additional_instructions") or "").strip()
     custom_prompt = (data.get("custom_prompt") or "").strip()
 
@@ -313,7 +373,7 @@ def preview_campaign_prompt():
         custom_prompt=custom_prompt,
     )
 
-    preset = Flux1DevConfig.get_preset(preset_id)
+    preset = Flux2KleinConfig.get_preset(preset_id)
     seed_val = data.get("seed")
     seed_display = "Auto-generated random integer" if (seed_val is None or str(seed_val).strip() == "") else seed_val
 
@@ -323,7 +383,7 @@ def preview_campaign_prompt():
             "prompt": prompt_data["prompt"],
             "negative_prompt": prompt_data["negative_prompt"],
             "structured_components": prompt_data.get("structured_components", {}),
-            "model_info": Flux1DevConfig.get_info(preset_id=preset["id"]),
+            "model_info": Flux2KleinConfig.get_info(preset_id=preset["id"]),
             "parameters": {
                 "width": prompt_data["dimensions"]["width"],
                 "height": prompt_data["dimensions"]["height"],
@@ -352,11 +412,11 @@ def preview_campaign_prompt():
 
 @generation_bp.route("/model-status", methods=["GET"])
 def get_model_status():
-    """Returns status and configuration for FLUX.1 Dev Q4 GGUF."""
-    preset = request.args.get("preset", Flux1DevConfig.DEFAULT_PRESET)
+    """Returns status and configuration for FLUX.2 Klein 4B Q4_K_M."""
+    preset = request.args.get("preset", Flux2KleinConfig.DEFAULT_PRESET)
     return jsonify({
         "success": True,
-        "data": Flux1DevConfig.get_info(preset_id=preset),
+        "data": Flux2KleinConfig.get_info(preset_id=preset),
     }), 200
 
 

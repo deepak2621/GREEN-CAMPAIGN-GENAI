@@ -1,9 +1,10 @@
 """
-FLUX.1 Dev Q4 GGUF Model Configuration for ComfyUI Integration.
+FLUX.2 Klein 4B Q4_K_M Model Configuration for ComfyUI Integration.
 Developer: Black Forest Labs
-Architecture: 12B Parameter Rectified Flow Diffusion Transformer (MMDiT)
-Quantization: Q4_K_S GGUF (city96/FLUX.1-dev-gguf) + T5-XXL Q4_K_M GGUF + CLIP-L FP16/FP8 + FLUX VAE.
-Execution: Local NVIDIA GPU with CUDA + CPU offloading and smart VRAM management.
+Architecture: 4B Distilled Flow-Matching Transformer with Qwen3-4B Text Encoder.
+Quantization: Q4_K_M GGUF (moonbox-dev/FLUX.2-klein-4B-GGUF) + qwen_3_4b.safetensors + flux2-vae.safetensors.
+License: Apache 2.0 (Commercial & Research Cleared).
+Execution: NVIDIA GPU + CPU offloading where supported.
 """
 
 import os
@@ -14,12 +15,12 @@ GENERATION_PRESETS = {
     "fast": {
         "id": "fast",
         "label": "Fast Mode",
-        "description": "512px base resolution, 18 steps — optimized for rapid campaign iteration",
-        "steps": 18,
-        "guidance": 3.5,
+        "description": "512px base resolution, 4 distilled steps — ultra-fast campaign iteration",
+        "steps": 4,
+        "guidance": 1.0,
         "cfg": 1.0,
         "sampler": "euler",
-        "scheduler": "simple",
+        "scheduler": "Flux2Scheduler",
         "aspect_ratios": {
             "1:1": {"width": 512, "height": 512, "label": "Square (1:1)"},
             "4:5": {"width": 512, "height": 640, "label": "Portrait (4:5)"},
@@ -29,12 +30,12 @@ GENERATION_PRESETS = {
     "quality": {
         "id": "quality",
         "label": "Quality Mode",
-        "description": "768px base resolution, 26 steps — high detail & photorealistic campaign posters",
-        "steps": 26,
-        "guidance": 3.5,
+        "description": "768px base resolution, 8 steps — higher resolution & fine campaign details",
+        "steps": 8,
+        "guidance": 1.0,
         "cfg": 1.0,
         "sampler": "euler",
-        "scheduler": "beta",
+        "scheduler": "Flux2Scheduler",
         "aspect_ratios": {
             "1:1": {"width": 768, "height": 768, "label": "Square (1:1)"},
             "4:5": {"width": 640, "height": 800, "label": "Portrait (4:5)"},
@@ -44,27 +45,26 @@ GENERATION_PRESETS = {
 }
 
 
-class Flux1DevConfig:
+class Flux2KleinConfig:
     # Model Identity & Licensing
-    MODEL_NAME = "FLUX.1 Dev (Q4_K_S GGUF)"
+    MODEL_NAME = "FLUX.2 Klein 4B Q4"
     DEVELOPER = "Black Forest Labs"
-    ARCHITECTURE = "12B Flow-Matching Transformer"
-    BASE_MODEL = "black-forest-labs/FLUX.1-dev"
-    GGUF_SOURCE = "city96/FLUX.1-dev-gguf"
-    QUANTIZATION = "Q4_K_S GGUF (T5-XXL Q4_K_M)"
-    LICENSE = "FLUX.1 [dev] Non-Commercial License"
+    ARCHITECTURE = "4B Distilled Flow-Matching Transformer"
+    BASE_MODEL = "black-forest-labs/FLUX.2-klein-4B"
+    GGUF_SOURCE = "moonbox-dev/FLUX.2-klein-4B-GGUF"
+    QUANTIZATION = "Q4_K_M GGUF"
+    LICENSE = "Apache 2.0 (Commercial & Research Cleared)"
+    IS_COMMERCIAL_CLEARED = True
 
-    # Checkpoints & Files (kept outside application source directory)
-    UNET_NAME = os.getenv("FLUX_UNET_NAME", "flux1-dev-Q4_K_S.gguf")
-    CLIP_L_NAME = os.getenv("FLUX_CLIP_L_NAME", "clip_l.safetensors")
-    T5_XXL_NAME = os.getenv("FLUX_T5_XXL_NAME", "t5-v1_1-xxl-encoder-Q4_K_M.gguf")
-    VAE_NAME = os.getenv("FLUX_VAE_NAME", "ae.safetensors")
+    # Checkpoints & Files (stored in ComfyUI models directory)
+    UNET_NAME = os.getenv("FLUX_UNET_NAME", "flux-2-klein-4b-Q4_K_M.gguf")
+    CLIP_NAME = os.getenv("FLUX_CLIP_NAME", "qwen_3_4b.safetensors")
+    VAE_NAME = os.getenv("FLUX_VAE_NAME", "flux2-vae.safetensors")
 
     # Directory Structure
     COMFY_DIR = Path(os.getenv("COMFY_DIR", r"C:\Users\deepa\ComfyUI"))
     UNET_PATH = COMFY_DIR / "models" / "unet" / UNET_NAME
-    CLIP_L_PATH = COMFY_DIR / "models" / "clip" / CLIP_L_NAME
-    T5_XXL_PATH = COMFY_DIR / "models" / "clip" / T5_XXL_NAME
+    CLIP_PATH = COMFY_DIR / "models" / "clip" / CLIP_NAME
     VAE_PATH = COMFY_DIR / "models" / "vae" / VAE_NAME
 
     # Default Hardware & Inference Parameters (Fast Mode default)
@@ -77,6 +77,7 @@ class Flux1DevConfig:
     SAMPLER_NAME = GENERATION_PRESETS["fast"]["sampler"]
     SCHEDULER = GENERATION_PRESETS["fast"]["scheduler"]
     BATCH_SIZE = 1
+    SPEED_TARGET = "< 10 seconds"
 
     # ComfyUI Local Server Endpoints
     COMFY_HOST = os.getenv("COMFY_HOST", "127.0.0.1")
@@ -86,7 +87,8 @@ class Flux1DevConfig:
 
     # Hardware & Execution Profile
     PROVIDER = "Local ComfyUI"
-    EXECUTION_PROFILE = "NVIDIA CUDA GPU + Smart CPU Offloading"
+    EXECUTION_PROFILE = "NVIDIA GPU + CPU offloading where supported"
+    LOW_VRAM = False
 
     @classmethod
     def get_preset(cls, preset_id: str) -> dict:
@@ -101,16 +103,15 @@ class Flux1DevConfig:
 
     @classmethod
     def is_checkpoint_available(cls) -> bool:
-        """Verifies that FLUX.1 Dev UNet, CLIP-L, T5-XXL GGUF, and VAE exist on disk and are complete."""
-        unet_ok = cls.UNET_PATH.exists() and cls.UNET_PATH.stat().st_size >= 5_500_000_000
-        clip_l_ok = cls.CLIP_L_PATH.exists() and cls.CLIP_L_PATH.stat().st_size >= 200_000_000
-        t5_ok = cls.T5_XXL_PATH.exists() and cls.T5_XXL_PATH.stat().st_size >= 2_500_000_000
+        """Verifies that FLUX.2 Klein UNet, Qwen3-4B text encoder, and FLUX.2 VAE exist and are complete."""
+        unet_ok = cls.UNET_PATH.exists() and cls.UNET_PATH.stat().st_size >= 2_200_000_000
+        clip_ok = cls.CLIP_PATH.exists() and cls.CLIP_PATH.stat().st_size >= 8_000_000_000
         vae_ok = cls.VAE_PATH.exists() and cls.VAE_PATH.stat().st_size >= 300_000_000
-        return unet_ok and clip_l_ok and t5_ok and vae_ok
+        return unet_ok and clip_ok and vae_ok
 
     @classmethod
     def get_info(cls, preset_id: str = "fast") -> dict:
-        """Returns comprehensive model metadata for frontend and API status responses."""
+        """Returns comprehensive metadata for frontend and API status responses."""
         checkpoint_ready = cls.is_checkpoint_available()
         preset = cls.get_preset(preset_id)
         return {
@@ -124,12 +125,12 @@ class Flux1DevConfig:
             "gguf_source": cls.GGUF_SOURCE,
             "unet_name": cls.UNET_NAME,
             "unet_exists": cls.UNET_PATH.exists(),
-            "clip_name": f"{cls.CLIP_L_NAME} + {cls.T5_XXL_NAME}",
-            "clip_l_exists": cls.CLIP_L_PATH.exists(),
-            "t5_xxl_exists": cls.T5_XXL_PATH.exists(),
+            "clip_name": cls.CLIP_NAME,
+            "clip_exists": cls.CLIP_PATH.exists(),
             "vae_name": cls.VAE_NAME,
             "vae_exists": cls.VAE_PATH.exists(),
             "license": cls.LICENSE,
+            "commercial_cleared": cls.IS_COMMERCIAL_CLEARED,
             "execution": cls.EXECUTION_PROFILE,
             "preset": preset["id"],
             "preset_label": preset["label"],
@@ -139,6 +140,7 @@ class Flux1DevConfig:
             "cfg_scale": preset["cfg"],
             "sampler": preset["sampler"],
             "scheduler": preset["scheduler"],
+            "speed_target": cls.SPEED_TARGET,
             "presets": {
                 k: {
                     "id": v["id"],
@@ -153,7 +155,3 @@ class Flux1DevConfig:
                 for k, v in GENERATION_PRESETS.items()
             },
         }
-
-
-# Alias for internal callers
-FluxModelConfig = Flux1DevConfig

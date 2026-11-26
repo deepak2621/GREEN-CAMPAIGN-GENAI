@@ -48,7 +48,15 @@ export default function HistoryPage({ setActivePage, onSelectForRegenerate, show
     fetchHistory()
       .then((res) => {
         if (isMounted) {
-          setHistoryItems(res.data || []);
+          const seen = new Set();
+          const unique = [];
+          for (const item of res.data || []) {
+            if (item?.id && !seen.has(item.id)) {
+              seen.add(item.id);
+              unique.push(item);
+            }
+          }
+          setHistoryItems(unique);
           setLoading(false);
         }
       })
@@ -388,7 +396,7 @@ export default function HistoryPage({ setActivePage, onSelectForRegenerate, show
               </button>
             </div>
 
-            <div className="bg-[#060908] rounded-2xl overflow-hidden flex items-center justify-center max-h-[480px] border border-white/10">
+            <div className="bg-slate-100 dark:bg-[#080d0b] rounded-2xl overflow-hidden flex items-center justify-center max-h-[480px] border border-slate-200 dark:border-white/10 transition-colors">
               <img
                 src={viewingItem.image_url}
                 alt={viewingItem.campaign_title}

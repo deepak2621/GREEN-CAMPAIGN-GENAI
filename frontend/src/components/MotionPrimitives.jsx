@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { ImageOff } from 'lucide-react';
 
 /**
  * Lightweight IntersectionObserver scroll reveal wrapper.
@@ -23,7 +24,7 @@ export function Reveal({ children, className = '', delay = 0 }) {
           observer.disconnect();
         }
       },
-      { threshold: 0.08, rootMargin: '0px 0px -30px 0px' }
+      { threshold: 0.08, rootMargin: '0px 0px -24px 0px' }
     );
 
     observer.observe(ref.current);
@@ -42,37 +43,27 @@ export function Reveal({ children, className = '', delay = 0 }) {
 }
 
 /**
- * Linear-inspired card with subtle cursor-tracking emerald radial spotlight & hover lift.
- * Updates CSS variables directly on the DOM node to avoid React re-renders.
+ * Clean surface card with subtle hover elevation and crisp border transition.
+ * No distracting cursor-tracking overlays over cards or selectable options.
  */
 export function SpotlightCard({ children, className = '', interactive = false, onClick }) {
-  const cardRef = useRef(null);
-
-  const handleMouseMove = (e) => {
-    const el = cardRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    el.style.setProperty('--mx', `${e.clientX - rect.left}px`);
-    el.style.setProperty('--my', `${e.clientY - rect.top}px`);
-  };
-
   return (
     <div
-      ref={cardRef}
-      onMouseMove={handleMouseMove}
       onClick={onClick}
-      className={`studio-card spotlight-card rounded-2xl ${
-        interactive ? 'hover:-translate-y-0.5 hover:border-emerald-500/35 hover:shadow-lg hover:shadow-emerald-950/10' : ''
+      className={`studio-card rounded-2xl ${
+        interactive
+          ? 'hover:-translate-y-0.5 hover:border-emerald-500/35 hover:shadow-md hover:shadow-emerald-950/5 dark:hover:shadow-black/30'
+          : ''
       } ${className}`}
     >
-      <div className="relative z-[2] h-full">{children}</div>
+      {children}
     </div>
   );
 }
 
 /**
- * Subtle magnetic button for primary calls-to-action.
- * Disabled automatically on touch devices or reduced motion.
+ * Clean primary CTA button with smooth CSS hover lift and keyboard focus ring.
+ * Preserves native browser pointer and never shifts away from cursor.
  */
 export function MagneticButton({
   children,
@@ -82,40 +73,12 @@ export function MagneticButton({
   disabled = false,
   ...props
 }) {
-  const btnRef = useRef(null);
-
-  const canMagnet = () => {
-    if (disabled || typeof window === 'undefined') return false;
-    return Boolean(
-      window.matchMedia?.('(pointer: fine)')?.matches &&
-        !window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
-    );
-  };
-
-  const handleMove = (e) => {
-    if (!canMagnet() || !btnRef.current) return;
-    const rect = btnRef.current.getBoundingClientRect();
-    const dx = ((e.clientX - (rect.left + rect.width / 2)) / rect.width) * 7;
-    const dy = ((e.clientY - (rect.top + rect.height / 2)) / rect.height) * 5;
-    btnRef.current.style.transform = `translate3d(${dx.toFixed(1)}px, ${dy.toFixed(1)}px, 0)`;
-  };
-
-  const handleLeave = () => {
-    if (btnRef.current) {
-      btnRef.current.style.transform = 'translate3d(0, 0, 0)';
-    }
-  };
-
   return (
     <button
-      ref={btnRef}
       type={type}
       disabled={disabled}
       onClick={onClick}
-      onMouseMove={handleMove}
-      onMouseLeave={handleLeave}
-      style={{ transition: 'transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s, box-shadow 0.2s, opacity 0.2s' }}
-      className={className}
+      className={`transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-[#070a09] ${className}`}
       {...props}
     >
       {children}
@@ -124,21 +87,33 @@ export function MagneticButton({
 }
 
 /**
- * Smooth image reveal with loading skeleton shimmer.
+ * Smooth image reveal with loading skeleton shimmer and graceful error fallback.
  */
 export function StudioImage({ src, alt, className = '', loading = 'lazy' }) {
-  const [loaded, setLoaded] = useState(false);
+  const [imageState, setImageState] = useState({ src, status: 'loading' }); // 'loading' | 'loaded' | 'error'
+  const status = imageState.src === src ? imageState.status : 'loading';
+
+  if (!src || status === 'error') {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-slate-100 dark:bg-slate-900/90 text-slate-400 dark:text-slate-500 p-4 text-center">
+        <ImageOff className="w-6 h-6 opacity-70" />
+        <span className="text-[11px] font-medium">Preview unavailable</span>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-full overflow-hidden">
-      {!loaded && <div className="absolute inset-0 studio-skeleton" />}
+      {status === 'loading' && <div className="absolute inset-0 studio-skeleton" />}
       <img
+        key={src}
         src={src}
         alt={alt}
         loading={loading}
-        onLoad={() => setLoaded(true)}
+        onLoad={() => setImageState({ src, status: 'loaded' })}
+        onError={() => setImageState({ src, status: 'error' })}
         className={`${className} transition-all duration-500 ${
-          loaded ? 'opacity-100 scale-100' : 'opacity-0 scale-[1.02]'
+          status === 'loaded' ? 'opacity-100 scale-100' : 'opacity-0 scale-[1.01]'
         }`}
       />
     </div>

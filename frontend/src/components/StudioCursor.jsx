@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 /**
- * Lightweight, GPU-accelerated custom studio cursor + ambient radial emerald glow.
+ * Subtle, non-intrusive emerald ambient background glow.
+ * - No custom cursor dot or trailing ring over UI controls.
+ * - Sits behind interface content (z-0, pointer-events-none).
+ * - Fades out automatically over interactive elements (buttons, links, inputs, cards).
  * - Disabled automatically on touch devices and when prefers-reduced-motion is enabled.
- * - Never intercepts pointer events or interferes with clicking, scrolling, or text selection.
  */
 export default function StudioCursor() {
   const [enabled, setEnabled] = useState(() => {
@@ -13,8 +15,6 @@ export default function StudioCursor() {
     return Boolean(finePointer && !reducedMotion);
   });
 
-  const dotRef = useRef(null);
-  const ringRef = useRef(null);
   const glowRef = useRef(null);
 
   useEffect(() => {
@@ -38,69 +38,40 @@ export default function StudioCursor() {
     if (!enabled) return;
 
     let rafId = 0;
-    let visible = false;
-    let hoveringInteractive = false;
-    let hoveringTextInput = false;
-
+    let isOverBackground = false;
     const target = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-    const ring = { x: target.x, y: target.y };
-    const glow = { x: target.x, y: target.y };
-
-    const updateVisibility = (show) => {
-      visible = show;
-      const opacity = show ? '1' : '0';
-      if (dotRef.current) dotRef.current.style.opacity = hoveringTextInput ? '0.25' : opacity;
-      if (ringRef.current) ringRef.current.style.opacity = hoveringTextInput ? '0.2' : opacity;
-      if (glowRef.current) glowRef.current.style.opacity = opacity;
-    };
+    const current = { x: target.x, y: target.y };
 
     const handleMove = (e) => {
       target.x = e.clientX;
       target.y = e.clientY;
 
       const el = e.target instanceof Element ? e.target : null;
-      hoveringTextInput = Boolean(el?.closest('input, textarea, select, [contenteditable="true"]'));
-      hoveringInteractive = Boolean(
-        !hoveringTextInput &&
-          el?.closest('a, button, [role="button"], label, [data-cursor="interactive"]')
+      const onInteractiveOrCard = Boolean(
+        el?.closest(
+          'a, button, [role="button"], input, textarea, select, option, label, nav, header, footer, .studio-card, [role="dialog"]'
+        )
       );
 
-      if (!visible) updateVisibility(true);
-      if (dotRef.current) {
-        dotRef.current.style.opacity = hoveringTextInput ? '0.2' : '1';
-      }
-      if (ringRef.current) {
-        ringRef.current.style.opacity = hoveringTextInput ? '0.15' : '1';
+      isOverBackground = !onInteractiveOrCard;
+      if (glowRef.current) {
+        glowRef.current.style.opacity = isOverBackground ? '1' : '0';
       }
     };
 
-    const handleLeave = () => updateVisibility(false);
+    const handleLeave = () => {
+      isOverBackground = false;
+      if (glowRef.current) {
+        glowRef.current.style.opacity = '0';
+      }
+    };
 
     const tick = () => {
-      // Smooth interpolation for trailing ring and soft ambient glow
-      ring.x += (target.x - ring.x) * 0.18;
-      ring.y += (target.y - ring.y) * 0.18;
-      glow.x += (target.x - glow.x) * 0.1;
-      glow.y += (target.y - glow.y) * 0.1;
-
-      if (dotRef.current) {
-        const dotScale = hoveringInteractive ? 0.7 : 1;
-        dotRef.current.style.transform = `translate3d(${target.x}px, ${target.y}px, 0) translate(-50%, -50%) scale(${dotScale})`;
-      }
-
-      if (ringRef.current) {
-        const ringScale = hoveringInteractive ? 1.55 : 1;
-        ringRef.current.style.transform = `translate3d(${ring.x}px, ${ring.y}px, 0) translate(-50%, -50%) scale(${ringScale})`;
-        ringRef.current.style.borderColor = hoveringInteractive
-          ? 'rgba(16, 185, 129, 0.65)'
-          : 'rgba(16, 185, 129, 0.35)';
-        ringRef.current.style.backgroundColor = hoveringInteractive
-          ? 'rgba(16, 185, 129, 0.08)'
-          : 'transparent';
-      }
+      current.x += (target.x - current.x) * 0.09;
+      current.y += (target.y - current.y) * 0.09;
 
       if (glowRef.current) {
-        glowRef.current.style.transform = `translate3d(${glow.x}px, ${glow.y}px, 0) translate(-50%, -50%)`;
+        glowRef.current.style.transform = `translate3d(${current.x}px, ${current.y}px, 0) translate(-50%, -50%)`;
       }
 
       rafId = window.requestAnimationFrame(tick);
@@ -120,46 +91,18 @@ export default function StudioCursor() {
   if (!enabled) return null;
 
   return (
-    <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[60] overflow-hidden">
-      {/* Subtle Cursor-Following Radial Emerald Glow */}
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
       <div
         ref={glowRef}
         style={{
           opacity: 0,
-          width: 440,
-          height: 440,
+          width: 480,
+          height: 480,
           background:
-            'radial-gradient(circle, rgba(16, 185, 129, 0.09) 0%, rgba(6, 95, 70, 0.035) 38%, transparent 72%)',
+            'radial-gradient(circle, rgba(16, 185, 129, 0.075) 0%, rgba(6, 95, 70, 0.03) 40%, transparent 72%)',
           willChange: 'transform',
         }}
         className="fixed top-0 left-0 rounded-full transition-opacity duration-300"
-      />
-
-      {/* Smooth Trailing Ring */}
-      <div
-        ref={ringRef}
-        style={{
-          opacity: 0,
-          width: 30,
-          height: 30,
-          border: '1.5px solid rgba(16, 185, 129, 0.35)',
-          willChange: 'transform',
-        }}
-        className="fixed top-0 left-0 rounded-full transition-[opacity,border-color,background-color] duration-200"
-      />
-
-      {/* Crisp Center Accent Dot */}
-      <div
-        ref={dotRef}
-        style={{
-          opacity: 0,
-          width: 6,
-          height: 6,
-          backgroundColor: '#10b981',
-          boxShadow: '0 0 10px rgba(16, 185, 129, 0.45)',
-          willChange: 'transform',
-        }}
-        className="fixed top-0 left-0 rounded-full transition-opacity duration-150"
       />
     </div>
   );

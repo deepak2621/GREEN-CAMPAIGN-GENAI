@@ -1,19 +1,23 @@
 import os
-from flask import Flask, jsonify
+import logging
+from flask import Flask, jsonify, request
 from flask_cors import CORS
+from werkzeug.exceptions import HTTPException
 from backend.config import Config
 from backend.database.db import init_db
 from backend.routes.generation import generation_bp
 from backend.routes.history import history_bp
 from backend.routes.auth import auth_bp
-from backend.services.model_config import Flux1DevConfig, GENERATION_PRESETS
+from backend.services.model_config import Flux2KleinConfig, GENERATION_PRESETS
+
+logger = logging.getLogger("green_campaign_ai")
 
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # Cross-Origin Resource Sharing with Authorization header support
+    # Enable Cross-Origin Resource Sharing including Authorization header
     CORS(
         app,
         resources={r"/api/*": {"origins": Config.CORS_ORIGINS}},
@@ -31,38 +35,39 @@ def create_app():
 
     @app.route("/api/health", methods=["GET"])
     def health_check():
-        """Health check endpoint confirming API availability and FLUX.1 Dev Q4 GGUF configuration."""
-        checkpoint_ready = Flux1DevConfig.is_checkpoint_available()
+        """Health check endpoint confirming API availability and FLUX.2 Klein 4B Q4 model configuration."""
+        checkpoint_ready = Flux2KleinConfig.is_checkpoint_available()
         status_text = "Ready" if checkpoint_ready else "Model Not Available"
 
         return jsonify({
             "status": "healthy",
             "app_name": "Green Campaign AI",
             "version": "2.0.0",
-            "provider": Flux1DevConfig.PROVIDER,
+            "provider": Flux2KleinConfig.PROVIDER,
             "provider_ready": checkpoint_ready,
-            "provider_note": "Active generation model: FLUX.1 Dev (12B Q4_K_S GGUF)",
-            "model": Flux1DevConfig.MODEL_NAME,
-            "developer": Flux1DevConfig.DEVELOPER,
-            "architecture": Flux1DevConfig.ARCHITECTURE,
+            "provider_note": "Active generation model: FLUX.2 Klein 4B Q4 (Distilled GGUF)",
+            "model": Flux2KleinConfig.MODEL_NAME,
+            "developer": Flux2KleinConfig.DEVELOPER,
+            "architecture": Flux2KleinConfig.ARCHITECTURE,
             "model_status": status_text,
-            "quantization": Flux1DevConfig.QUANTIZATION,
-            "unet": Flux1DevConfig.UNET_NAME,
-            "clip": f"{Flux1DevConfig.CLIP_L_NAME} + {Flux1DevConfig.T5_XXL_NAME}",
-            "vae": Flux1DevConfig.VAE_NAME,
-            "resolution": f"{Flux1DevConfig.DEFAULT_WIDTH}x{Flux1DevConfig.DEFAULT_HEIGHT}",
-            "inference_steps": Flux1DevConfig.INFERENCE_STEPS,
-            "guidance_scale": Flux1DevConfig.GUIDANCE_SCALE,
-            "cfg_scale": Flux1DevConfig.CFG_SCALE,
-            "execution": Flux1DevConfig.EXECUTION_PROFILE,
-            "license": Flux1DevConfig.LICENSE,
+            "quantization": Flux2KleinConfig.QUANTIZATION,
+            "unet": Flux2KleinConfig.UNET_NAME,
+            "clip": Flux2KleinConfig.CLIP_NAME,
+            "vae": Flux2KleinConfig.VAE_NAME,
+            "resolution": f"{Flux2KleinConfig.DEFAULT_WIDTH}x{Flux2KleinConfig.DEFAULT_HEIGHT}",
+            "inference_steps": Flux2KleinConfig.INFERENCE_STEPS,
+            "guidance_scale": Flux2KleinConfig.GUIDANCE_SCALE,
+            "cfg_scale": Flux2KleinConfig.CFG_SCALE,
+            "execution": Flux2KleinConfig.EXECUTION_PROFILE,
+            "license": Flux2KleinConfig.LICENSE,
+            "speed_target": Flux2KleinConfig.SPEED_TARGET,
             "database": "sqlite",
             "storage_ready": os.path.isdir(Config.GENERATED_IMAGES_DIR),
         }), 200
 
     @app.route("/api/config", methods=["GET"])
     def get_app_config():
-        """Returns campaign generation metadata options and FLUX.1 Dev presets."""
+        """Returns campaign generation metadata options and FLUX.2 Klein 4B presets."""
         return jsonify({
             "categories": [
                 "Water Conservation",
@@ -94,17 +99,65 @@ def create_app():
                 {"ratio": "16:9", "label": "Landscape (16:9)", "width": 640, "height": 384},
             ],
             "presets": GENERATION_PRESETS,
-            "current_provider": Flux1DevConfig.PROVIDER,
-            "model": Flux1DevConfig.MODEL_NAME,
+            "current_provider": Flux2KleinConfig.PROVIDER,
         }), 200
 
     @app.errorhandler(404)
     def not_found(e):
-        return jsonify({"success": False, "error": "Endpoint not found"}), 404
+        return jsonify({
+            "success": False,
+            "error": "Endpoint not found",
+            "message": "The requested API endpoint was not found.",
+            "error_code": "NOT_FOUND",
+            "error_type": "NotFoundError",
+        }), 404
 
     @app.errorhandler(500)
     def internal_error(e):
-        return jsonify({"success": False, "error": "Internal server error"}), 500
+        logger.exception("Unhandled HTTP 500 error on %s %s", request.method, request.path)
+        return jsonify({
+            "success": False,
+            "error": "Internal server error",
+            "message": "An unexpected server error occurred. Please try again.",
+            "error_code": "INTERNAL_SERVER_ERROR",
+            "error_type": "InternalError",
+        }), 500
+
+    @app.errorhandler(HTTPException)
+    def handle_http_exception(e: HTTPException):
+        code = e.code or 500
+        code_map = {
+            400: "BAD_REQUEST",
+            401: "UNAUTHORIZED",
+            403: "FORBIDDEN",
+            404: "NOT_FOUND",
+            405: "METHOD_NOT_ALLOWED",
+            413: "PAYLOAD_TOO_LARGE",
+            415: "UNSUPPORTED_MEDIA_TYPE",
+            422: "UNPROCESSABLE_ENTITY",
+            429: "RATE_LIMITED",
+            502: "BAD_GATEWAY",
+            503: "SERVICE_UNAVAILABLE",
+            504: "GATEWAY_TIMEOUT",
+        }
+        return jsonify({
+            "success": False,
+            "error": e.name,
+            "message": e.description or e.name or "Request failed.",
+            "error_code": code_map.get(code, f"HTTP_{code}"),
+            "error_type": type(e).__name__,
+        }), code
+
+    @app.errorhandler(Exception)
+    def handle_unexpected_exception(e: Exception):
+        logger.exception("Unhandled exception on %s %s", request.method, request.path)
+        return jsonify({
+            "success": False,
+            "error": "Internal server error",
+            "message": "An unexpected server error occurred. Please try again.",
+            "error_code": "INTERNAL_SERVER_ERROR",
+            "error_type": "InternalError",
+        }), 500
 
     return app
 
@@ -113,5 +166,4 @@ if __name__ == "__main__":
     app = create_app()
     port = int(os.environ.get("PORT", 5000))
     print(f"Starting Green Campaign AI Backend on http://127.0.0.1:{port}")
-    # Disable Werkzeug reloader so only one backend process owns the job manager & ComfyUI lock
-    app.run(host="127.0.0.1", port=port, debug=Config.FLASK_DEBUG, use_reloader=False)
+    app.run(host="0.0.0.0", port=port, debug=Config.FLASK_DEBUG)

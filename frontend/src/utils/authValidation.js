@@ -26,3 +26,4 @@ export function validatePassword(password) {
   const failed = rules.find((r) => !r.met);
   return failed ? `Password requirement missing: ${failed.label}.` : '';
 }
+
